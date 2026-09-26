@@ -1,0 +1,146 @@
+# Murugan Shorts — pipeline settings.
+# Everything here can be overridden per episode in episodes/<name>/episode.toml
+# (same section/key names). Paths are relative to this folder.
+
+[paths]
+episodes = "episodes"
+output = "Final"                      # finished Shorts land here (the uploader reads this folder)
+cache = ".cache"                      # reusable TTS lines, baked images, overlays; safe to delete
+ffmpeg = "tools/ffmpeg/bin/ffmpeg.exe"
+ffprobe = "tools/ffmpeg/bin/ffprobe.exe"
+checkpoints = "checkpoints"           # IndicTTS FastPitch + HiFi-GAN
+fonts = "assets/fonts"
+bgm = "assets/murugan_baby.mp3"       # "" = no background music
+
+[run]
+preset = "balanced"                   # fast | balanced | best  (see [presets.*] below)
+low_priority = true                   # run below normal priority so the laptop stays responsive
+keep_awake = true                     # stop Windows idle-sleep from pausing a run (only while it runs)
+threads = 4                           # CPU threads for TTS / ffmpeg (4 = this laptop's physical cores)
+
+[video]
+width = 1080
+height = 1920
+fps = 25
+encoder = "auto"                      # auto (Intel Quick Sync, else x264) | qsv | x264
+quality = 23                          # lower = better/larger. QSV ICQ / x264 CRF scale
+filename = "muruganShorts_{date}.mp4"
+
+[voice]
+style = "baby"                        # baby | young_male | male  (see [voice.styles.*])
+line_gap_ms = 930                     # pause between lines, as heard in your published Shorts: the old code's
+                                      # 320 ms + 454 ms Coqui adds after every sentence, x1.2 slowdown
+lead_in_ms = 400                      # silence before the first line (room for the hook title)
+tail_ms = 1600                        # silence after the last line (room for the outro)
+
+# Voice styles keep the exact values of the original test.py presets, so the
+# voice you already publish doesn't change. pace < 1 = slower speech: the old
+# rubberband "-t 1.2" meant 1.2x LONGER, i.e. pace 1/1.2 = 0.833.
+[voice.styles.baby]
+speaker = "female"
+semitones = 4.0
+pace = 0.833
+formant = "shifted"                   # shifted | preserved (rubberband)
+eq_gain_db = 0.0
+compress = false
+
+[voice.styles.young_male]
+speaker = "male"
+semitones = 4.0
+pace = 0.833
+formant = "preserved"
+eq_gain_db = 2.5
+compress = true
+
+[voice.styles.male]
+speaker = "male"
+semitones = 0.0
+pace = 1.0
+formant = "preserved"
+eq_gain_db = 0.0
+compress = true
+
+[audio]
+target_lufs = -14.0                   # YouTube's playback loudness
+true_peak_db = -1.0
+bgm_db = -15.0                        # music level before ducking (original pipeline value)
+duck = true                           # lower the music automatically while the voice speaks
+bgm_fade_s = 1.5
+sample_rate = 48000
+
+[captions]
+enabled = true
+font = "Mukta Malar ExtraBold"
+size = 82
+words_per_caption = 3                 # short chunks read better on a phone than whole sentences
+color = "#FFFFFF"
+highlight_text = "#000000"
+highlight_box = "#FFE600"             # yellow word highlight, as in your published Shorts
+outline = 5
+position_y = 0.72                     # 0 = top, 1 = bottom. Below the subject, above YouTube's bottom UI; override per episode if it covers a face
+
+[effects.kenburns]
+enabled = true
+zoom = 0.08                           # 8% slow zoom over each image
+pan = 0.03                            # up to 3% drift
+seed = 7                              # same seed = identical motion on re-render
+
+[effects.transition]
+enabled = true                        # only used when an episode has 2+ images
+style = "crossfade"                   # crossfade | zoom | slide
+duration_s = 0.8
+
+[effects.grade]
+enabled = true
+warmth = 0.06                         # golden devotional tone
+saturation = 1.08
+contrast = 1.05
+lut = ""                              # optional .cube file; overrides the three values above
+
+[effects.bloom]
+enabled = true
+strength = 0.22
+radius = 18
+
+[effects.particles]
+enabled = true
+count = 70                            # golden sparkles / light dust
+loop_s = 6.0
+opacity = 0.85
+overlay = ""                          # optional: your own overlay video (screen-blended), replaces generated particles
+
+[effects.vignette]
+enabled = true
+strength = 0.35
+
+[effects.watermark]
+enabled = true
+lines = ["Subscribe & Share", "BrahmaNadagam"]
+opacity = 0.55
+position_y = 0.84
+
+[effects.hook]
+enabled = true                        # title card over the first seconds
+text = ""                             # "" = use the episode title, or the first line
+duration_s = 1.8
+
+[effects.outro]
+enabled = true
+text = "தினமும் முருகன் அருள் — Subscribe"   # no emoji: the caption font can't draw them
+duration_s = 1.6
+
+[effects.fade]
+enabled = true
+in_s = 0.4
+out_s = 0.6
+
+# Speed-vs-quality presets: each overrides the settings above.
+[presets.fast]
+video = { quality = 27 }
+effects = { bloom = { enabled = false }, particles = { count = 35 } }
+
+[presets.balanced]
+
+[presets.best]
+video = { quality = 20 }
+effects = { particles = { count = 110 } }

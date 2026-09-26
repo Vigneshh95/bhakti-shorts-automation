@@ -1,153 +1,176 @@
-# Murugan Voice Generation - Tamil TTS Setup
+# Murugan Shorts
 
-This project generates Tamil voice narration using IndicTTS models with baby voice effects and background music mixing.
+Turns a few lines of Tamil text and an image into a finished YouTube Short, with no manual
+editing. The Short is 1080×1920 and includes:
 
-## 🚀 Quick Start
+- the IndicTTS voice (baby / young male / male)
+- background music that ducks under the voice
+- word-highlighted Tamil captions
+- Ken Burns motion, golden sparkles, glow, colour grade and vignette
+- a hook title, an outro and your watermark
+- loudness normalised to −14 LUFS
 
-### 1. Install Dependencies
-```bash
-# Activate virtual environment
-.\.venv\Scripts\activate
+One command, about 2 minutes on this laptop (about 45 s when the lines are already cached).
 
-# Dependencies are already installed:
-# - PyTorch (CPU version)
-# - TTS library
-# - Audio processing libraries (scipy, pydub, librosa)
-```
+## Setup (once)
 
-### 2. Download Tamil IndicTTS Models
+Everything is already in this folder:
 
-**⚠️ IMPORTANT: You need to download the actual Tamil model files from AI4Bharat**
+| What | Where |
+|---|---|
+| Python environment | `.venv/` |
+| FFmpeg 9.0.2 (gyan.dev essentials) | `tools/ffmpeg/` |
+| Tamil TTS models | `checkpoints/` |
+| Caption font (Mukta Malar, OFL) | `assets/fonts/` |
 
-#### Option A: Manual Download
-1. Visit: https://github.com/AI4Bharat/Indic-TTS
-2. Download Tamil FastPitch and HiFi-GAN models
-3. Extract and place files in the correct structure:
-
-```
-checkpoints/
-├── fastpitch/
-│   ├── best_model.pth      # FastPitch acoustic model
-│   ├── config.json         # FastPitch configuration
-│   └── speakers.pth         # Speaker embeddings (male/female)
-└── hifigan/
-    ├── best_model.pth      # HiFi-GAN vocoder
-    └── config.json         # HiFi-GAN configuration
-```
-
-#### Option B: Using Hugging Face (if available)
-```bash
-# Check if models are available on Hugging Face
-# Some IndicTTS models might be available there
-```
-
-### 3. Test the Setup
-```bash
-python test_tamil_tts.py
-```
-
-### 4. Run the Main Script
-```bash
-python murugan_voice_gen.py
-```
-
-## 📁 Project Structure
+To check that everything is in place (including Intel Quick Sync hardware encoding):
 
 ```
-Murugan/
-├── checkpoints/           # Tamil TTS models (download required)
-│   ├── fastpitch/
-│   └── hifigan/
-├── assets/               # Reference audio files
-├── output/               # Generated audio files
-├── temp/                 # Temporary processing files
-├── murugan_voice_gen.py  # Main script
-├── test_tamil_tts.py     # Test script
-└── download_models.py    # Model download helper
+.venv\Scripts\python.exe -m shorts check
 ```
 
-## 🎯 Features
+Installing on a new machine: `pip install -r requirements.txt`, unzip the gyan.dev FFmpeg
+"release essentials" build into `tools/ffmpeg/`, and copy `checkpoints/`.
 
-- **Tamil Text-to-Speech**: Uses IndicTTS FastPitch + HiFi-GAN models
-- **Baby Voice Effects**: Pitch shifting, reverb, normalization
-- **Background Music**: Optional BGM mixing
-- **Multiple Formats**: WAV and MP3 output
-- **Error Handling**: Comprehensive error checking and logging
+## Make a Short
 
-## 🔧 Configuration
+1. Create an episode folder:
+   ```
+   .venv\Scripts\python.exe -m shorts new 2026-09-27
+   ```
+2. Put one Tamil sentence per line in `episodes/2026-09-27/lines.txt`.
+3. Drop one or more images in `episodes/2026-09-27/images/`. With 2+ images, the video
+   switches image between sentences, using a transition.
+4. Optionally set a hook title in `episodes/2026-09-27/episode.toml`.
+5. Build it:
+   ```
+   make_short.bat episodes\2026-09-27
+   ```
+   or `.venv\Scripts\python.exe -m shorts make episodes/2026-09-27 [--preset fast|balanced|best] [--voice baby|young_male|male]`
 
-### Tamil Text Lines
-Edit the `LINES` array in `murugan_voice_gen.py`:
+The result goes to `Final/muruganShorts_<date>.mp4`, with a matching `.txt` that the
+uploader uses for the title. Upload as before with `upload_short.bat`.
+
+`episodes/sample-2026-03-08/` is a complete example (the lines from your 2026-03-08 Short).
+
+## Configuration
+
+Every setting lives in **`config.toml`**, with a comment next to each one. Any of them can be
+overridden for one episode in its `episode.toml`, using the same section and key names:
+
+```toml
+[episode]
+title = "பெண்மையைப் போற்று"
+
+[voice]
+style = "male"
+
+[captions]
+position_y = 0.78        # move captions down if they cover a face in this image
+```
+
+| Section | What it controls |
+|---|---|
+| `[run]` | preset (`fast` / `balanced` / `best`), CPU threads, low priority, keep-awake |
+| `[video]` | resolution, fps, encoder (`auto` = Quick Sync, else x264), quality, output file name |
+| `[voice]` | voice style, pauses between lines; `[voice.styles.*]` holds pitch, pace, EQ per style |
+| `[audio]` | loudness target, music level, ducking on/off, fades |
+| `[captions]` | font, size, words per caption, colours, height |
+| `[effects.*]` | each effect's on/off switch and settings |
+| `[presets.*]` | what `fast` and `best` change relative to `balanced` |
+
+## How it works
+
+```
+episodes/<name>/lines.txt + images/ + episode.toml
+        │
+        ▼
+ script     read lines, images, title
+ tts        FastPitch + HiFi-GAN, one speaker ──► per-line WAV + exact word timings   [cached per line]
+ audio      ONE ffmpeg graph: pitch/pace (rubberband) → EQ → music loop + ducking
+            → mix; loudness measured (EBU R128)
+ captions   word timings → captions.ass (word highlight, hook, outro, watermark)
+ visuals    each image cover-fit to 9:16, then bake effects (grade, bloom)           [cached per image]
+ render     frame generator (sub-pixel Ken Burns, transitions, sparkles, vignette)
+               │ raw YUV frames through a pipe (nothing written to disk)
+               ▼
+            ONE ffmpeg: libass text → fades → loudness correction
+                        → Intel Quick Sync H.264 + AAC → Final/…mp4
+```
+
+Why it's fast and light:
+- **Static work happens once.** Colour grade and glow are baked into each image once and
+  cached. Voice lines are cached individually, so editing one line re-synthesizes only
+  that line. A fully cached episode never loads the voice model.
+- **One pass, no re-encoding.** Frames stream straight into a single FFmpeg process that
+  draws all the text and encodes on the Iris Xe's Quick Sync engine, so the CPU isn't
+  used for encoding.
+- **Word timings are free.** FastPitch predicts how long each character lasts. Summing
+  those per word gives exact caption timing, so no separate alignment model is needed.
+- **It's kind to the laptop.** It runs below normal priority, threads are capped
+  (`[run] threads`), and it asks Windows not to idle-sleep mid-run.
+
+Code layout:
+
+```
+shorts/
+  __main__.py         command line: make / new / check
+  pipeline.py         runs the stages, timing + peak-memory summary
+  config.py           config.toml + preset + episode.toml merge
+  cache.py            content-hash cache (.cache/, safe to delete)
+  ffmpeg.py           FFmpeg helpers, Quick Sync detection
+  stages/             script, tts, audio, captions, visuals, render
+  effects/            registry + image effects (bake) + frame effects (per-frame)
+tests/                one test file per stage + an end-to-end test
+```
+
+## Adding an effect
+
+Effects declare **where** they run. That's what keeps them cheap:
+
+| Hook | Runs | Use for |
+|---|---|---|
+| `bake(img)` | once per image, cached | anything static: colour, glow, sharpening |
+| `prepare(ctx)` + `frame(rgb, t)` | every frame | small or local changes: sprites, a precomputed mask |
+
+Example: a slow golden "breathing" glow at the top of the frame.
+
 ```python
-LINES = [
-    "அன்பே மிகப் பெரிய வலிமை. ஒரு சிறிய உதவும் பெரிய மகிழ்ச்சியை தரும்.",
-    "நல்ல சிந்தனைகள் உன்னை உயர்த்தும், தீய சிந்தனைகள் உன்னை தாழ்த்தும்.",
-    # Add more Tamil lines...
-]
+# shorts/effects/overlays.py  (or a new module imported in effects/__init__.py)
+@effect("halo")
+class Halo(Effect):
+    has_frame = True
+
+    def prepare(self, ctx):
+        yy = np.linspace(1, 0, ctx.height // 3, dtype=np.float32)[:, None, None]
+        self.band = (yy ** 2 * np.array([60, 45, 10], np.float32)).astype(np.uint8)  # warm gradient
+
+    def frame(self, rgb, t):
+        k = 0.5 + 0.5 * np.sin(t * 1.2)                  # breathe
+        top = rgb[: self.band.shape[0]]
+        cv2.add(top, (self.band * k).astype(np.uint8), dst=top)
 ```
 
-### Voice Settings
-- **Speaker**: `"female"` or `"male"` (if supported by speakers.pth)
-- **Pitch Shift**: `semitones=4` (higher = more baby-like)
-- **Reverb**: `add_reverb=True` (adds echo effect)
-- **BGM Volume**: `bgm_db=-18` (background music level)
+Then switch it on in `config.toml`:
 
-## 🐛 Troubleshooting
+```toml
+[effects.halo]
+enabled = true
+```
 
-### Common Issues
+Text effects (captions, hook, outro, watermark) are ASS subtitle events, created in
+`shorts/stages/captions.py`.
 
-1. **"Missing model files" error**
-   - Download the Tamil IndicTTS models from AI4Bharat
-   - Ensure files are in the correct directory structure
+## Tests
 
-2. **"TTS synthesizer not initialized" error**
-   - Check that all model files are present and not corrupted
-   - Verify file paths in the script
+```
+.venv\Scripts\python.exe -m pytest tests
+```
 
-3. **Audio quality issues**
-   - Ensure you're using the correct Tamil models
-   - Check that speakers.pth supports the speaker_name you're using
+The end-to-end test builds a real Short through every stage and the real FFmpeg, using a
+stand-in voice so it finishes in seconds.
 
-4. **FFmpeg errors**
-   - Install FFmpeg and ensure it's in your PATH
-   - Check that input audio files exist
+## Uploading
 
-### Model File Requirements
-
-- **FastPitch**: Acoustic model for Tamil speech synthesis
-- **HiFi-GAN**: Vocoder for high-quality audio generation
-- **Speakers.pth**: Speaker embeddings for voice selection
-- **Config files**: Model configuration parameters
-
-## 📚 Resources
-
-- [AI4Bharat IndicTTS Repository](https://github.com/AI4Bharat/Indic-TTS)
-- [TTS Library Documentation](https://tts.readthedocs.io/)
-- [PyTorch Installation Guide](https://pytorch.org/get-started/locally/)
-
-## 🎵 Output Files
-
-The script generates:
-- `murugan_tts_raw_YYYY-MM-DD.wav` - Raw Tamil speech
-- `murugan_tts_baby_YYYY-MM-DD.wav` - Baby voice processed
-- `murugan_voice_final_YYYY-MM-DD.wav` - Final with BGM
-- `murugan_voice_final_YYYY-MM-DD.mp3` - MP3 version
-
-## ⚡ Performance Tips
-
-- Use CPU for smaller models, GPU for faster processing
-- Adjust `silence_ms` for different pause lengths between sentences
-- Modify `semitones` for different baby voice effects
-- Use `bgm_db` to control background music volume
-
----
-
-**Note**: This setup requires downloading the actual Tamil IndicTTS model files from AI4Bharat. The placeholder files in the checkpoints directory are just for structure reference.
-
-
-
-
-
-
-
-
+`upload_short.bat` / `autouploadmurugan.py` are unchanged. They upload today's file from `Final/`
+and read the title highlight from the `.txt` the pipeline writes next to it.
