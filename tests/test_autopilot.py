@@ -334,3 +334,43 @@ def test_emphasis_words_are_gold_in_captions(cfg):
     ass = build_ass(words, 2.0, cfg, "")
     second = [l for l in ass.splitlines() if l.startswith("Dialogue: 1,")][1]  # while the 2nd word is spoken
     assert "\\1c" + ass_color(cfg["captions"]["emphasis_color"]) + "}உழைப்பு" in second
+
+
+def test_removed_picture_is_replaced_instead_of_failing(settings, monkeypatch):
+    st = _fake_world(monkeypatch, settings)
+    run_mod.run(date(2026, 9, 27), upload=False)          # writes today's script for b.png
+    (settings["paths"]["image_folder"] / "b.png").unlink()  # the user removes that picture
+
+    def pick_offered(m, s, u, schema, images=None):
+        if schema is S.REVIEW_SCHEMA:
+            return {"ok": True, "issues": []}
+        return dict(GOOD, image_id=schema["properties"]["image_id"]["enum"][0])
+
+    monkeypatch.setattr(writer, "_provider", lambda name: type("P", (), {"complete_json": staticmethod(pick_offered)}))
+    rec = run_mod.run(date(2026, 9, 27), upload=False)
+    assert rec["image"] == "a.png" and st["renders"] == 2  # new picture, new script, new video
+
+
+def test_hashtag_slips_are_tidied_not_rejected(settings):
+    data = S.tidy(dict(GOOD, hashtags=["#Letting Go", "Murugan", "#Murugan", "#a", "#b", "#c", "#d"],
+                       keywords=["உழைப்பு,"]))
+    assert data["hashtags"] == ["#LettingGo", "#Murugan", "#a", "#b", "#c"]
+    assert data["keywords"] == ["உழைப்பு"]
+    assert S.tidy(dict(GOOD, hashtags=["#x"]))["hashtags"] == ["#x", "#முருகன்", "#Murugan"]
+    assert S.validate(data, settings, IDS) == []
+
+
+def test_outages_do_not_use_up_content_drafts(settings, monkeypatch):
+    calls = {"n": 0}
+
+    def flaky(model, system, user, schema, images=None):
+        calls["n"] += 1
+        if model != "gemini-3.6-flash":
+            raise ProviderError("HTTP 503 overloaded")
+        if schema is S.REVIEW_SCHEMA:
+            return {"ok": True, "issues": []}
+        return GOOD if "problems" in user else dict(GOOD, lines=["English."] * 6)  # 2nd draft is good
+
+    monkeypatch.setattr(writer, "_provider", lambda name: type("P", (), {"complete_json": staticmethod(flaky)}))
+    sc = writer.write_script(planner.Plan(date(2026, 9, 27), "x"), settings, [], PICS)
+    assert sc.provider == "gemini:gemini-3.6-flash"  # two overloaded models skipped, then 2 drafts succeeded

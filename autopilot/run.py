@@ -2,6 +2,7 @@
 -> video (shorts engine) -> scheduled upload."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import shutil
@@ -125,7 +126,11 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
                     saved = json.loads(script_path.read_text(encoding="utf-8"))
                     digest = saved.pop("image_digest", "")
                     script = Script(**saved)
-                    log.info("  reusing today's reviewed script and picture (%s)", script.image_id)
+                    if (folder / script.image_id).exists():
+                        log.info("  reusing today's reviewed script and picture (%s)", script.image_id)
+                    else:  # the picture was removed from the folder: choose again and write for the new one
+                        log.info("  today's picture %s was removed from the folder; choosing another", script.image_id)
+                        script = None
                 except (ValueError, TypeError) as e:  # unreadable or from an older version: write a new one
                     log.warning("  can't reuse today's saved script (%s); writing a new one", e)
             if script is None:
@@ -140,8 +145,6 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
                 script_path.write_text(json.dumps({**script.to_dict(), "image_digest": digest}, ensure_ascii=False,
                                                   indent=1), encoding="utf-8")
             src = folder / script.image_id
-            if not src.exists():
-                raise RuntimeError(f"Today's picture {src.name} is no longer in {folder}; run again with --force.")
             img_dir = ep_dir / "images"
             shutil.rmtree(img_dir, ignore_errors=True)
             img_dir.mkdir(parents=True)
@@ -156,14 +159,21 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
 
         out = settings["paths"]["output"] / f"muruganAuto_{day.isoformat()}.mp4"
         with timer.stage("video"):
-            inputs = [script_path, ep_dir / "episode.toml", ep_dir / "lines.txt"]
-            if out.exists() and not force and out.stat().st_mtime > max(p.stat().st_mtime for p in inputs if p.exists()) - 5:
+            # Fingerprint of everything the video is made from; the video is reused only if it matches
+            # (timestamps aren't reliable enough to decide that).
+            fingerprint = hashlib.sha256("\n".join([
+                (ep_dir / "lines.txt").read_text(encoding="utf-8"),
+                (ep_dir / "episode.toml").read_text(encoding="utf-8"),
+                digest, script.image_id]).encode("utf-8")).hexdigest()
+            stamp = out.with_suffix(".fingerprint")
+            if out.exists() and not force and stamp.exists() and stamp.read_text() == fingerprint:
                 log.info("  reusing today's finished video")
             else:
                 from shorts.pipeline import make_short
 
                 out.parent.mkdir(parents=True, exist_ok=True)  # the engine only creates its own default folder
                 make_short(ep_dir, out_date=day.isoformat(), output=out)
+                stamp.write_text(fingerprint)
 
         record = {"date": day.isoformat(), "theme": plan.theme, "title": script.youtube_title,
                   "writer": script.provider, "image": script.image_id, "image_digest": digest, "video": str(out),

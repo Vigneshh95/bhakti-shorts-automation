@@ -108,6 +108,26 @@ def _words(lines: list[str]) -> set[str]:
     return {w.strip(" .,;:!?") for line in lines for w in line.split()}
 
 
+def tidy(data: dict) -> dict:
+    """Fixes purely mechanical slips in place instead of rejecting a good script over them:
+    hashtag formatting/count, and punctuation stuck to key words."""
+    tags, seen = [], set()
+    for h in data.get("hashtags", []):
+        h = "#" + re.sub(r"[\s#.,;:!?]+", "", str(h))
+        if len(h) > 1 and h.lower() not in seen:
+            seen.add(h.lower())
+            tags.append(h)
+    for default in ("#முருகன்", "#Murugan", "#TamilDevotional"):
+        if len(tags) >= 3:
+            break
+        if default.lower() not in seen:
+            seen.add(default.lower())
+            tags.append(default)
+    data["hashtags"] = tags[:5]
+    data["keywords"] = [str(k).strip(" .,;:!?") for k in data.get("keywords", [])]
+    return data
+
+
 def validate(data: dict, settings: dict, image_ids: list[str]) -> list[str]:
     """Problems that would make the Short fail or look bad; empty list = publishable."""
     c = settings["content"]

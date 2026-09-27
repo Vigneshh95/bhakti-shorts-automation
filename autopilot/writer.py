@@ -13,7 +13,7 @@ from autopilot.http import ProviderError
 from autopilot.planner import Plan
 from shorts.log import log
 
-MAX_ATTEMPTS = 4  # content retries; switching to a fallback model after an outage uses one too
+MAX_DRAFTS = 3  # chances to fix the script's content (outages don't count against these)
 
 
 class NoPublishableScript(RuntimeError):
@@ -60,42 +60,41 @@ def _write_with(name: str, plan: Plan, settings: dict, recent_titles: list[str],
     ids = [pid for pid, _ in pictures]
     out_schema = S.schema(ids)
 
-    feedback, rejected = "", False
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        log.info("  writing script with %s (%s), attempt %d", name, model, attempt)
+    feedback, drafts = "", 0
+    # Content attempts (drafts) and outages are counted separately: switching to a backup model
+    # because one is overloaded never uses up a chance to fix the script.
+    while drafts < MAX_DRAFTS:
+        log.info("  writing script with %s (%s), draft %d", name, model, drafts + 1)
         try:
-            data = provider.complete_json(model, system, user + feedback, out_schema)
+            data = S.tidy(provider.complete_json(model, system, user + feedback, out_schema))
             problems = S.validate(data, settings, ids)
-            if problems:
-                rejected = True
-                log.warning("  draft rejected: %s", "; ".join(problems))
-                feedback = ("\n\nYour previous answer had these problems; fix all of them:\n- " + "\n- ".join(problems)
-                            + "\nPrevious answer:\n" + json.dumps(data, ensure_ascii=False))
-                continue
-            chosen = dict(pictures).get(data["image_id"], "")
-            review = provider.complete_json(
-                model, S.REVIEW_SYSTEM,
-                json.dumps(data, ensure_ascii=False, indent=1) + f"\n\nChosen picture: {chosen}", S.REVIEW_SCHEMA)
+            if not problems:
+                chosen = dict(pictures).get(data["image_id"], "")
+                review = provider.complete_json(
+                    model, S.REVIEW_SYSTEM,
+                    json.dumps(data, ensure_ascii=False, indent=1) + f"\n\nChosen picture: {chosen}", S.REVIEW_SCHEMA)
         except (ProviderError, json.JSONDecodeError) as e:
             log.warning("  %s failed: %s", model, str(e).splitlines()[0][:200])
-            if model != models[-1]:
-                model = models[models.index(model) + 1]
-                log.info("  switching to fallback model %s", model)
-            elif attempt == MAX_ATTEMPTS or not rejected:
-                raise
+            if model == models[-1]:
+                raise  # every model of this provider is unavailable: the caller tries the next provider
+            model = models[models.index(model) + 1]
+            log.info("  switching to fallback model %s", model)
             continue
 
+        drafts += 1
+        if problems:
+            log.warning("  draft rejected: %s", "; ".join(problems))
+            feedback = ("\n\nYour previous answer had these problems; fix all of them:\n- " + "\n- ".join(problems)
+                        + "\nPrevious answer:\n" + json.dumps(data, ensure_ascii=False))
+            continue
         if review.get("ok"):
             result = S.to_script(data, f"{name}:{model}")
             result.review_issues = review.get("issues", [])
             return result
-        rejected = True
         issues = review.get("issues") or ["reviewer rejected the script"]
         log.warning("  review rejected the draft: %s", "; ".join(issues))
         feedback = ("\n\nAn editor rejected your previous answer for these reasons; write a new version that fixes them:\n- "
                     + "\n- ".join(issues) + "\nPrevious answer:\n" + json.dumps(data, ensure_ascii=False))
 
-    if rejected:
-        raise NoPublishableScript(f"No script passed checks and review after {MAX_ATTEMPTS} attempts -- "
-                                  "nothing was made or uploaded.")
-    raise ProviderError(f"{name}: no response after {MAX_ATTEMPTS} attempts")
+    raise NoPublishableScript(f"No script passed checks and review after {MAX_DRAFTS} drafts -- "
+                              "nothing was made or uploaded.")
