@@ -70,6 +70,29 @@ class Particles(Effect):
             cv2.add(roi, patch.astype(np.uint8), dst=roi)  # additive light, saturating at 255
 
 
+@effect("glow_pulse")
+class GlowPulse(Effect):
+    """A soft warm light that slowly 'breathes' around the subject (divine-presence feel).
+    The glow is precomputed once; each frame is one scalar multiply + one saturating add."""
+    has_frame = True
+
+    def prepare(self, ctx: RenderContext):
+        cx, cy = self.cfg.get("center", [0.5, 0.42])
+        radius = float(self.cfg.get("radius", 0.38)) * ctx.width
+        yy, xx = np.mgrid[0:ctx.height, 0:ctx.width].astype(np.float32)
+        d2 = (xx - cx * ctx.width) ** 2 + (yy - cy * ctx.height) ** 2
+        glow = np.exp(-d2 / (2 * radius ** 2))[..., None] * _GOLD * float(self.cfg.get("strength", 0.22))
+        self.glow = np.clip(glow, 0, 255).astype(np.uint8)
+        self.period = float(self.cfg.get("period_s", 4.0))
+        self.buf = np.empty_like(self.glow)
+
+    def frame(self, rgb, t):
+        k = 0.5 - 0.5 * np.cos(2 * np.pi * t / self.period)  # 0..1, smooth
+        # convertScaleAbs scales every channel (cv2.multiply by a plain number would scale only the first)
+        cv2.convertScaleAbs(self.glow, dst=self.buf, alpha=k)
+        cv2.add(rgb, self.buf, dst=rgb)
+
+
 @effect("vignette")
 class Vignette(Effect):
     """Darkens the corners to pull the eye to the centre. Screen-fixed (doesn't move with

@@ -58,15 +58,20 @@ def _check() -> int:
     s = load_settings()
     ok = True
     for provider, key in (("gemini", "GEMINI_API_KEY"), ("openai", "OPENAI_API_KEY"), ("claude", "ANTHROPIC_API_KEY")):
-        used = provider in (s["providers"]["writer"], s["providers"]["image"], s["providers"].get("fallback_image"))
+        used = provider in (s["providers"]["writer"], s["providers"].get("fallback_writer"), "gemini")  # gemini: picture descriptions
         have = bool(api_key(key))
-        if used and not have:
+        if used and not have and provider in ("gemini", s["providers"]["writer"]):
             ok = False
         log.info("%s %-8s key %s%s", "✓" if have else ("✗" if used else "•"), provider,
                  "found" if have else "missing", "  (in use)" if used else "")
-    folder = s["paths"]["image_folder"]
-    n = len([f for f in folder.glob("*") if f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}]) if folder.exists() else 0
-    log.info("%s fallback image folder: %d images in %s", "✓" if n else "•", n, folder)
+    from autopilot import library
+
+    pictures = library.load(s["paths"]["image_folder"])  # no describe: read-only count
+    described = sum(1 for p in pictures if p.info)
+    if not pictures:
+        ok = False
+    log.info("%s pictures: %d in %s (%d described, the rest are described on the next run)",
+             "✓" if pictures else "✗", len(pictures), s["paths"]["image_folder"], described)
     try:
         log.info("✓ YouTube sign-in works: channel '%s'", youtube.check_sign_in())
     except Exception as e:  # noqa: BLE001

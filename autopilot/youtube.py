@@ -123,6 +123,17 @@ def upload(video: Path, script: Script, settings: dict, publish_at: datetime | N
     return video_id
 
 
+def preflight(interactive: bool) -> bool:
+    """Checks (and if needed renews) the YouTube sign-in BEFORE the run does any work.
+    Interactive: opens the browser for approval right away. Unattended: returns False instead,
+    so the run can still make the video and upload it after the user approves."""
+    try:
+        _credentials(channel_config(), interactive)
+        return True
+    except SignInRequired:
+        return False
+
+
 def check_sign_in() -> str:
     """Read-only: confirms the saved token works and returns the channel name."""
     from googleapiclient.discovery import build

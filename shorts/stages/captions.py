@@ -41,6 +41,11 @@ def escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\n", "\\N")
 
 
+def _plain(word: str) -> str:
+    """A word without surrounding punctuation, for matching emphasis words."""
+    return word.strip(" .,;:!?।'\"()")
+
+
 def chunk_words(words: list[TimedWord], per_chunk: int) -> list[Chunk]:
     """Short phrases (default 3 words) read better on a phone than whole sentences.
     A chunk never spans two spoken lines and breaks early after punctuation."""
@@ -85,6 +90,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     if cap["enabled"] and words:
         hi_text, hi_box = ass_color(cap["highlight_text"]), ass_color(cap["highlight_box"])
+        emphasis = {_plain(w) for w in cap.get("emphasis", [])}
+        emph_color = ass_color(cap.get("emphasis_color", "#FFC94D"))
         chunks = chunk_words(words, cap["words_per_caption"])
         for ci, chunk in enumerate(chunks):
             chunk_end = chunks[ci + 1].start if ci + 1 < len(chunks) else min(duration, chunk.words[-1].end + 0.6)
@@ -96,6 +103,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     text = escape(other.text)
                     if wj == wi:
                         parts.append(f"{{\\1c{hi_text}\\3c{hi_box}\\bord{cap['outline'] + 9}\\shad0}}{text}{{\\r}}")
+                    elif _plain(other.text) in emphasis:
+                        parts.append(f"{{\\1c{emph_color}}}{text}{{\\r}}")  # key word of the day, in gold
                     else:
                         parts.append(text)
                 pop = "\\fscx88\\fscy88\\t(0,110,\\fscx100\\fscy100)\\fad(90,0)" if wi == 0 else ""

@@ -46,6 +46,19 @@ class History:
     def recent_titles(self, n: int) -> list[str]:
         return [r.get("title", "") for r in self.runs[-n:] if r.get("title")]
 
+    def image_usage(self) -> dict[str, list[str]]:
+        """picture digest -> dates it was used (made into a video)."""
+        usage: dict[str, set[str]] = {}
+        for r in self.runs:
+            if r.get("image_digest"):
+                usage.setdefault(r["image_digest"], set()).add(r["date"])  # a resumed day counts once
+        return {k: sorted(v) for k, v in usage.items()}
+
+    def last_image(self, before: date) -> str | None:
+        """Digest of the most recent picture used before `before` (so it isn't repeated next day)."""
+        prior = [r for r in self.runs if r.get("image_digest") and r["date"] < before.isoformat()]
+        return max(prior, key=lambda r: r["date"])["image_digest"] if prior else None
+
     def uploads_on(self, day: date) -> list[dict]:
         return [r for r in self.runs if r.get("date") == day.isoformat() and r.get("video_id")]
 

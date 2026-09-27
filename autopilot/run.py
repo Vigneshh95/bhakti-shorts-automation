@@ -1,13 +1,17 @@
-"""One click: plan -> write + review -> image -> video (shorts engine) -> scheduled upload."""
+"""One click: sign-in check -> topic -> picture + script (written for that picture, reviewed)
+-> video (shorts engine) -> scheduled upload."""
 from __future__ import annotations
 
 import json
 import logging
+import shutil
 import time as time_module
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from autopilot import images, planner, writer, youtube
+from autopilot import library, planner, writer, youtube
+from autopilot.http import ProviderError
+from autopilot.notify import notify
 from autopilot.script import Script
 from autopilot.settings import load_settings
 from shorts.log import StageTimer, log
@@ -21,14 +25,34 @@ def _file_log(path: Path) -> logging.Handler:
     return h
 
 
-def _write_patiently(plan, settings: dict, history, interactive: bool) -> Script:
+def _describer(settings: dict):
+    """Describes new pictures with Gemini's vision model (free tier), trying the fallback
+    models if one is overloaded or out of today's quota."""
+    from autopilot.providers import gemini
+
+    backups = settings["models"].get("gemini_text_fallback") or []
+    models = [settings["models"]["gemini_text"], *([backups] if isinstance(backups, str) else backups)]
+
+    def describe(system, user, schema, images):
+        last = None
+        for model in models:
+            try:
+                return gemini.complete_json(model, system, user, schema, images=images)
+            except ProviderError as e:
+                last = e
+        raise last
+
+    return describe
+
+
+def _write_patiently(plan, settings: dict, history, pictures, interactive: bool) -> Script:
     """Unattended runs wait out temporary outages (e.g. "model overloaded") instead of losing
     the day; a manual click fails fast so nobody sits watching a console."""
     tries = 1 if interactive else 1 + int(settings["schedule"].get("outage_retries", 3))
     wait = int(settings["schedule"].get("outage_wait_minutes", 10))
     for attempt in range(1, tries + 1):
         try:
-            return writer.write_script(plan, settings, history.recent_titles(20))
+            return writer.write_script(plan, settings, history.recent_titles(20), pictures)
         except writer.NoPublishableScript:
             raise
         except RuntimeError as e:
@@ -38,6 +62,20 @@ def _write_patiently(plan, settings: dict, history, interactive: bool) -> Script
                         str(e).splitlines()[0][:120], wait, attempt, tries - 1)
             time_module.sleep(wait * 60)
     raise AssertionError("unreachable")
+
+
+def _episode_toml(script: Script, look: dict) -> str:
+    """Turns on the autopilot's look for this episode only (config.toml defaults stay off, so
+    the manual workflow is unchanged)."""
+    keywords = ", ".join(json.dumps(k, ensure_ascii=False) for k in script.keywords)
+    loop = look.get("loop", True)
+    return (f"[episode]\ntitle = {json.dumps(script.hook_title, ensure_ascii=False)}\n\n"
+            f"[captions]\nemphasis = [{keywords}]\n\n"
+            f"[effects.kenburns]\nloop = {str(loop).lower()}\n\n"
+            f"[effects.glow_pulse]\nenabled = {str(look.get('glow_pulse', True)).lower()}\n\n"
+            # Open on the picture itself (the first frame is what stops the scroll) and don't fade
+            # to black at the end, which would break the seamless loop.
+            f"[effects.fade]\nenabled = {str(not loop).lower()}\n")
 
 
 def run(day: date | None = None, upload: bool = True, publish_now: bool = False, force: bool = False,
@@ -55,56 +93,85 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
                      ", ".join(f"https://youtu.be/{r['video_id']}" for r in already))
             return already[-1]
 
+        signed_in = True
+        if upload:
+            with timer.stage("youtube sign-in"):
+                signed_in = youtube.preflight(interactive)
+                if not signed_in:
+                    log.warning("  YouTube sign-in has expired: making the video now; it will upload after you approve.")
+                    notify("Murugan Short: approve YouTube",
+                           "Today's Short is being made. Double-click auto_short.bat and approve in the browser to upload it.")
+
         with timer.stage("plan"):
             plan = planner.plan_day(day, settings, history)
             log.info("  %s", plan.context())
 
         script_path = ep_dir / "script.json"
-        with timer.stage("write + review"):
+        folder = settings["paths"]["image_folder"]
+        with timer.stage("picture + script"):
+            script = None
             if script_path.exists() and not force:
-                log.info("  reusing today's reviewed script (%s)", script_path.name)
-                script = Script(**json.loads(script_path.read_text(encoding="utf-8")))
-            else:
-                script = _write_patiently(plan, settings, history, interactive)
-                script_path.write_text(json.dumps(script.to_dict(), ensure_ascii=False, indent=1), encoding="utf-8")
+                try:
+                    saved = json.loads(script_path.read_text(encoding="utf-8"))
+                    digest = saved.pop("image_digest", "")
+                    script = Script(**saved)
+                    log.info("  reusing today's reviewed script and picture (%s)", script.image_id)
+                except (ValueError, TypeError) as e:  # unreadable or from an older version: write a new one
+                    log.warning("  can't reuse today's saved script (%s); writing a new one", e)
+            if script is None:
+                pictures = library.load(folder, describe=_describer(settings))
+                if not pictures:
+                    raise RuntimeError(f"No usable pictures in {folder} -- add some .jpg/.png images there.")
+                cands = library.candidates(pictures, history.image_usage(), history.last_image(before=day),
+                                           settings["content"]["picture_choices"], seed=day.toordinal())
+                log.info("  %d pictures in the library; offering the writer %d least-used", len(pictures), len(cands))
+                script = _write_patiently(plan, settings, history, [(p.id, p.summary()) for p in cands], interactive)
+                digest = next(p.digest for p in cands if p.id == script.image_id)
+                script_path.write_text(json.dumps({**script.to_dict(), "image_digest": digest}, ensure_ascii=False,
+                                                  indent=1), encoding="utf-8")
+            src = folder / script.image_id
+            if not src.exists():
+                raise RuntimeError(f"Today's picture {src.name} is no longer in {folder}; run again with --force.")
+            img_dir = ep_dir / "images"
+            shutil.rmtree(img_dir, ignore_errors=True)
+            img_dir.mkdir(parents=True)
+            shutil.copy2(src, img_dir / f"01{src.suffix.lower()}")
+            log.info("  picture: %s", script.image_id)
             log.info("  title: %s", script.youtube_title)
             for line in script.lines:
                 log.info("    %s", line)
 
-        with timer.stage("image"):
-            img = ep_dir / "images" / "01.png"
-            if img.exists() and not force:
-                source = "reused"
-                log.info("  reusing today's image")
-            else:
-                used = {r["image_source"].split(":", 1)[1] for r in history.runs
-                        if r.get("image_source", "").startswith("folder:")}
-                img, source = images.get_image(settings, script.image_prompt, ep_dir / "images", used)
-            log.info("  image: %s", source)
-
         (ep_dir / "lines.txt").write_text("\n".join(script.lines) + "\n", encoding="utf-8")
-        (ep_dir / "episode.toml").write_text(f'[episode]\ntitle = {json.dumps(script.hook_title, ensure_ascii=False)}\n',
-                                             encoding="utf-8")
+        (ep_dir / "episode.toml").write_text(_episode_toml(script, settings.get("look", {})), encoding="utf-8")
 
         out = settings["paths"]["output"] / f"muruganAuto_{day.isoformat()}.mp4"
         with timer.stage("video"):
-            from shorts.pipeline import make_short
+            inputs = [script_path, ep_dir / "episode.toml", ep_dir / "lines.txt"]
+            if out.exists() and not force and out.stat().st_mtime > max(p.stat().st_mtime for p in inputs if p.exists()) - 5:
+                log.info("  reusing today's finished video")
+            else:
+                from shorts.pipeline import make_short
 
-            out.parent.mkdir(parents=True, exist_ok=True)  # the engine only creates its own default folder
-            result = make_short(ep_dir, out_date=day.isoformat(), output=out)
+                out.parent.mkdir(parents=True, exist_ok=True)  # the engine only creates its own default folder
+                make_short(ep_dir, out_date=day.isoformat(), output=out)
 
         record = {"date": day.isoformat(), "theme": plan.theme, "title": script.youtube_title,
-                  "writer": script.provider, "image_source": source, "video": str(result.output),
+                  "writer": script.provider, "image": script.image_id, "image_digest": digest, "video": str(out),
                   "made_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-        if upload:
+        if upload and signed_in:
             with timer.stage("upload"):
                 when = None if publish_now else youtube.publish_time(datetime.now(timezone.utc), settings)
-                video_id = youtube.upload(result.output, script, settings, when, interactive)
+                video_id = youtube.upload(out, script, settings, when, interactive)
                 record.update(video_id=video_id, publish_at=when.isoformat() if when else "now")
                 local = when.astimezone(youtube.IST).strftime("%d %b %H:%M IST") if when else "now"
                 log.info("✅ Uploaded https://youtu.be/%s -- goes public %s", video_id, local)
+                if not interactive:
+                    notify("Murugan Short scheduled", f"{script.youtube_title} -- public {local}")
+        elif upload:
+            record["pending_upload"] = True
+            log.info("⏸ Video ready: %s. Double-click auto_short.bat to approve YouTube and upload it.", out)
         else:
-            log.info("✅ Made %s (upload skipped)", result.output)
+            log.info("✅ Made %s (upload skipped)", out)
         history.add(record)
         log.info("%s", timer.summary())
         return record

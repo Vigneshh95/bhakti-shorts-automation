@@ -12,7 +12,9 @@ from autopilot.http import ProviderError
 from autopilot.settings import api_key
 
 
-def complete_json(model: str, system: str, user: str, schema: dict) -> dict:
+def complete_json(model: str, system: str, user: str, schema: dict, images=None) -> dict:
+    # images: unused -- the picture library is described once by Gemini's vision model, and
+    # the writer chooses from those text descriptions.
     try:
         import anthropic
     except ImportError as e:

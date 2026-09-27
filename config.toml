@@ -77,6 +77,8 @@ color = "#FFFFFF"
 highlight_text = "#000000"
 highlight_box = "#FFE600"             # yellow word highlight, as in your published Shorts
 outline = 5
+emphasis = []                         # key words shown in gold whenever on screen (the autopilot sets these per episode)
+emphasis_color = "#FFC94D"
 position_y = 0.72                     # 0 = top, 1 = bottom. Below the subject, above YouTube's bottom UI; override per episode if it covers a face
 
 [effects.kenburns]
@@ -84,6 +86,7 @@ enabled = true
 zoom = 0.08                           # 8% slow zoom over each image
 pan = 0.03                            # up to 3% drift
 seed = 7                              # same seed = identical motion on re-render
+loop = false                          # one image: motion returns to its start so replays loop seamlessly
 
 [effects.transition]
 enabled = true                        # only used when an episode has 2+ images
@@ -108,6 +111,13 @@ count = 70                            # golden sparkles / light dust
 loop_s = 6.0
 opacity = 0.85
 overlay = ""                          # optional: your own overlay video (screen-blended), replaces generated particles
+
+[effects.glow_pulse]
+enabled = false                       # soft warm light that slowly "breathes" around the subject
+center = [0.5, 0.42]                  # where the subject usually is (fractions of width, height)
+radius = 0.38
+strength = 0.22
+period_s = 4.0
 
 [effects.vignette]
 enabled = true

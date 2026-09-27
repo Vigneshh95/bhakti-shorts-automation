@@ -32,7 +32,8 @@ def _provider(name: str):
     return p
 
 
-def write_script(plan: Plan, settings: dict, recent_titles: list[str]) -> S.Script:
+def write_script(plan: Plan, settings: dict, recent_titles: list[str], pictures: list[tuple[str, str]]) -> S.Script:
+    """pictures: (image_id, description) of today's candidate pictures; the writer picks one."""
     order = [settings["providers"]["writer"]]
     backup = settings["providers"].get("fallback_writer")
     if backup and backup not in order:
@@ -40,7 +41,7 @@ def write_script(plan: Plan, settings: dict, recent_titles: list[str]) -> S.Scri
     last: Exception | None = None
     for name in order:
         try:
-            return _write_with(name, plan, settings, recent_titles)
+            return _write_with(name, plan, settings, recent_titles, pictures)
         except NoPublishableScript:
             raise  # the model worked but the content never passed review: another provider won't be "safer"
         except (ProviderError, json.JSONDecodeError, RuntimeError) as e:
@@ -49,27 +50,32 @@ def write_script(plan: Plan, settings: dict, recent_titles: list[str]) -> S.Scri
     raise RuntimeError(f"No writer could produce a script ({', '.join(order)}): {last}")
 
 
-def _write_with(name: str, plan: Plan, settings: dict, recent_titles: list[str]) -> S.Script:
+def _write_with(name: str, plan: Plan, settings: dict, recent_titles: list[str],
+                pictures: list[tuple[str, str]]) -> S.Script:
     provider = _provider(name)
     backups = settings["models"].get(f"{name}_text_fallback") or []
     models = [settings["models"][f"{name}_text"], *([backups] if isinstance(backups, str) else backups)]
     model = models[0]
-    system, user = S.build_prompt(plan, settings, recent_titles)
+    system, user = S.build_prompt(plan, settings, recent_titles, pictures)
+    ids = [pid for pid, _ in pictures]
+    out_schema = S.schema(ids)
 
     feedback, rejected = "", False
     for attempt in range(1, MAX_ATTEMPTS + 1):
         log.info("  writing script with %s (%s), attempt %d", name, model, attempt)
         try:
-            data = provider.complete_json(model, system, user + feedback, S.SCHEMA)
-            problems = S.validate(data, settings)
+            data = provider.complete_json(model, system, user + feedback, out_schema)
+            problems = S.validate(data, settings, ids)
             if problems:
                 rejected = True
                 log.warning("  draft rejected: %s", "; ".join(problems))
                 feedback = ("\n\nYour previous answer had these problems; fix all of them:\n- " + "\n- ".join(problems)
                             + "\nPrevious answer:\n" + json.dumps(data, ensure_ascii=False))
                 continue
-            review = provider.complete_json(model, S.REVIEW_SYSTEM, json.dumps(data, ensure_ascii=False, indent=1),
-                                            S.REVIEW_SCHEMA)
+            chosen = dict(pictures).get(data["image_id"], "")
+            review = provider.complete_json(
+                model, S.REVIEW_SYSTEM,
+                json.dumps(data, ensure_ascii=False, indent=1) + f"\n\nChosen picture: {chosen}", S.REVIEW_SCHEMA)
         except (ProviderError, json.JSONDecodeError) as e:
             log.warning("  %s failed: %s", model, str(e).splitlines()[0][:200])
             if model != models[-1]:

@@ -28,6 +28,7 @@ class Segment:
     zoom_from: float
     zoom_to: float
     pan: tuple[float, float]  # fraction of the headroom margin to drift across (x, y)
+    loop: bool = False  # go there and back, so the last frame matches the first (seamless replay)
 
 
 def bake_image(src: Path, cfg: dict, effects: list[Effect], cache: Cache) -> np.ndarray:
@@ -81,6 +82,10 @@ def plan_segments(images: list[np.ndarray], line_spans: list[tuple[float, float]
         z0, z1 = (1.0, 1.0 + zoom) if zoom_in else (1.0 + zoom, 1.0)
         direction = rng.uniform(-1, 1, 2) * (pan / max(HEADROOM - 1, 1e-6))
         segments.append(Segment(images[i], bounds[i], bounds[i + 1], z0, z1, (float(direction[0]), float(direction[1]))))
+    # Seamless loop (Shorts replay automatically, and replays count): with one image the
+    # motion returns to where it started, so the jump from the last frame to the first is invisible.
+    if kb_cfg.get("loop", False) and len(segments) == 1:
+        segments[0].loop = True
     return segments
 
 
@@ -90,7 +95,8 @@ def _ease(p: float) -> float:
 
 def _warp(seg: Segment, t: float, W: int, H: int) -> np.ndarray:
     span = max(seg.end - seg.start, 1e-6)
-    p = _ease(min(max((t - seg.start) / span, 0.0), 1.0))
+    raw = min(max((t - seg.start) / span, 0.0), 1.0)
+    p = 0.5 - 0.5 * np.cos(2 * np.pi * raw) if seg.loop else _ease(raw)  # loop: 0 -> 1 -> 0, smooth at both ends
     z = seg.zoom_from + (seg.zoom_to - seg.zoom_from) * p
     MH, MW = seg.image.shape[:2]
     zf = z * W / MW

@@ -1,25 +1,22 @@
-# Autopilot: fully automatic Murugan Shorts, from topic to scheduled YouTube upload.
+# Autopilot: fully automatic Murugan Shorts, from topic to scheduled YouTube upload,
+# using pictures you put in daily_images/.
 # Separate from the manual workflow (config.toml / make_short.bat), which it never changes.
 # Video settings (voice, captions, effects) still come from config.toml.
 
 [providers]
-writer = "gemini"          # gemini | claude | openai   -- writes the Tamil script + YouTube metadata
-image = "gemini"           # gemini | openai | folder   -- makes the background image
+writer = "gemini"          # gemini | claude | openai   -- picks the picture, writes the Tamil script + YouTube metadata
 fallback_writer = "openai"  # used if the main writer is down (e.g. Gemini overloaded)
-fallback_image = "folder"  # used if the image provider fails ("" = stop instead)
 
 [models]
 gemini_text = "gemini-3.8-flash"
 gemini_text_fallback = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]   # tried in order if the main model is overloaded (verified 2026-09-27)
-gemini_image = "gemini-3.1-flash-image"     # paid: ~$0.04 per image; billing must be enabled on the key
 claude_text = "claude-opus-5"               # needs ANTHROPIC_API_KEY (or `ant auth login`)
 openai_text = "gpt-5.4-mini"
-openai_image = "gpt-image-2"
 
 [paths]
 episodes = "episodes/auto"          # one folder per day: script.json, image, run log
 output = "Final/auto"               # finished videos (kept apart from Final/, so upload_short.bat can't pick them up)
-image_folder = "assets/auto_images" # for image = "folder" / fallback: unused images are taken in name order
+image_folder = "daily_images"       # PUT YOUR PICTURES HERE. New ones are described once (free Gemini vision) and cached
 state = "episodes/auto/history.json"
 
 [content]
@@ -28,6 +25,7 @@ lines_min = 6
 lines_max = 8
 max_line_chars = 70                 # keeps each spoken line short and clear for the TTS voice
 recent_topics_to_avoid = 45         # don't repeat a theme used in the last N runs
+picture_choices = 12                # least-used pictures offered to the writer each day (never yesterday's)
 # Rotating everyday themes (used when the day isn't a festival).
 themes = [
   "courage and fearlessness", "discipline", "patience", "gratitude", "honouring mother and father",
@@ -53,6 +51,10 @@ name_en = "Soorasamharam"
 date = "2026-11-25"
 name_ta = "கார்த்திகை தீபம்"
 name_en = "Karthigai Deepam"
+
+[look]                              # extra effects for autopilot videos only (manual workflow unaffected)
+loop = true                         # motion returns to its start: seamless replays
+glow_pulse = true                   # soft "breathing" divine light around the subject
 
 [youtube]
 publish_time = "18:30"              # IST. The Short is uploaded now but goes public at this time (next day if it has passed)

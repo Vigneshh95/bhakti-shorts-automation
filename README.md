@@ -190,50 +190,48 @@ Metadata fixes made in the uploader:
 
 # Autopilot: fully automatic Shorts (one click or daily)
 
-A second, separate workflow. It does everything on its own:
-1. Picks today's topic: a listed festival, then Tuesday (Murugan's day), then a rotating theme not used recently.
-2. Writes the Tamil script and the YouTube title, description, hashtags and tags with an AI writer. Each draft is validated, then reviewed by a second AI pass for Tamil quality, respect and honesty. Nothing unreviewed is published.
-3. Creates a matching devotional image with AI, with no text in the image.
-4. Makes the video with the same engine as above (voice, captions, effects).
-5. Uploads to YouTube, scheduled to go public at the evening slot (18:30 IST by default), with the AI-content disclosure set, then adds it to your playlist.
+A second, separate workflow that uses **your own pictures**. You drop devotional images into
+`daily_images/`, and every day it:
+1. **Picks the topic.** A listed festival first, then Tuesday (Murugan's day), then a rotating theme not used recently.
+2. **Chooses the picture.** Each new picture is described once by Gemini's free vision model: what it shows, its mood, the themes it suits, and any text painted on it. Descriptions are cached, and pictures are identified by content, so renaming is free. The writer is offered the least-used pictures, never yesterday's, picks the one that fits today's message, and writes the message to match it.
+3. **Writes the Tamil script and YouTube details:** title with the keyword first, description, 3–5 hashtags, tags, and 1–3 key words. Every draft is validated, then reviewed by a second AI pass for Tamil quality, respect, honesty and fit with the picture. Nothing unreviewed is published.
+4. **Makes the video** with the same engine as the manual workflow, plus the autopilot look: a seamless loop (motion returns to its start, with no fade to black, so replays flow), the key words in gold, and a gentle glow "breathing" around Murugan.
+5. **Uploads to YouTube**, scheduled for 18:30 IST, with the AI-content disclosure set and Tamil as the language, then adds it to your playlist.
 
-It never touches the manual workflow. Its videos go to `Final/auto/`, so `upload_short.bat` can't pick them up.
+It never changes the manual workflow. Its videos go to `Final/auto/`.
 
 ## Use it
 
 | Action | How |
 |---|---|
+| Add pictures | copy .jpg/.png files into `daily_images/` (at least 700 px on the short side) |
 | One click | double-click `auto_short.bat` |
 | Preview (no upload) | `auto_short.bat --no-upload` |
 | Go public immediately | `auto_short.bat --publish-now` |
-| Check keys and YouTube sign-in | `.venv\Scripts\python.exe -m autopilot check` |
+| Check keys, pictures and YouTube sign-in | `.venv\Scripts\python.exe -m autopilot check` |
 | Daily automatic run | `.venv\Scripts\python.exe -m autopilot schedule install` (`remove` / `status`) |
 
-Each day's files are kept in `episodes/auto/<date>/`: the script, image and `run.log`.
+Each day's files are in `episodes/auto/<date>/`: the script, a copy of the chosen picture, and `run.log`.
 
-The autopilot is safe to click twice. It uploads at most once a day (`max_uploads_per_day`), and if a run fails part-way, the next run reuses that day's reviewed script and image.
+## When the YouTube sign-in expires
 
-## Providers (autopilot.toml)
+- **Morning scheduled run:** the video is still made, and a Windows notification asks you to approve.
+- **Your double-click:** `auto_short.bat` opens the Google approval page first. After you approve, the ready video uploads without being re-made.
 
-| | Options | Needs |
-|---|---|---|
-| Writer | `gemini` (default), `claude`, `openai` | `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` (+ `pip install anthropic`) / `OPENAI_API_KEY` in `.env` |
-| Image | `gemini` (default), `openai`, `folder` | Gemini or OpenAI images need billing enabled; `folder` uses `assets/auto_images/` |
+It never uploads twice in a day. If a run stops part-way, the next one reuses that day's reviewed script and picture.
 
-Claude writes text only; it doesn't generate images.
+To make the sign-in last, set the Google Cloud app's publishing status to **In production** (*Google Auth Platform → Audience*). In *Testing* mode the approval expires every 7 days.
 
-Fallbacks for unattended runs:
+## Writers (autopilot.toml)
+
+`writer = "gemini"` (default), `"claude"` or `"openai"`, plus a `fallback_writer`. Keys go in `.env` as `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` (and `pip install anthropic`), or `OPENAI_API_KEY`. Picture descriptions always use Gemini, which is free.
+
+Unattended resilience:
 - An overloaded model switches to the next one in `gemini_text_fallback`.
 - A writer that's down switches to `fallback_writer`.
-- A failed image uses `fallback_image`.
-- Scheduled runs wait out short outages (`outage_retries`, `outage_wait_minutes`).
+- Scheduled runs wait out short outages.
 - Quota and billing errors are recognised and not retried pointlessly.
 
-Costs: the Gemini text free tier allows 20 requests a day per model, and a run needs 2–6. Gemini images cost about $0.04 (~₹3.3) each.
+The Gemini free tier allows 20 requests a day per model. A day uses 2–6, plus one per 6 new pictures the first time they're seen.
 
-## One-time setup for reliable daily uploads
-
-1. **Enable billing** on the Gemini key (Google AI Studio → Billing). Without it, images come from `assets/auto_images/` instead.
-2. **Sign in to YouTube once.** Double-click `auto_short.bat`; the browser opens and you approve. Scheduled runs can't open a browser, so they stop with a clear message if the sign-in expires.
-3. **Keep the sign-in from expiring.** In Google Cloud Console → *Google Auth Platform → Audience*, set the app's publishing status to **In production**. Apps left in *Testing* have their sign-in expire every **7 days**, which would stop daily uploads weekly.
-4. **Add festival dates** each year in `autopilot.toml` under `[[festivals]]`. The AI is never asked to guess lunar-calendar dates.
+Add each year's festival dates under `[[festivals]]` in `autopilot.toml`. The AI is never asked to guess lunar-calendar dates.
