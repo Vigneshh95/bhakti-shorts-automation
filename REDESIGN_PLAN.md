@@ -279,3 +279,31 @@ Each step ends with running the pipeline and comparing against the baseline.
 2. OK to `git init` this folder and work on a `redesign` branch?
 3. OK to download FFmpeg 9.0.2 (gyan.dev) and a Tamil font (Google Fonts)?
 4. Background music: keep `assets/murugan_baby.mp3` as the default track? Make sure you have the rights to it; YouTube Audio Library tracks are a free alternative.
+
+---
+
+## 10. Results (measured 2026-09-26, after implementation)
+
+Same 8 lines, same image, same laptop. Both runs cold (nothing cached).
+
+| | Before (`test.py --voice baby`) | After (`python -m shorts make`) |
+|---|---|---|
+| **Total time** | **2 h 8 min 33 s** (7,713 s) | **107.5 s** cold · **40.8 s** cached (≈72× / 189× faster) |
+| Voice (load + synthesize) | ~69 s (two speakers; one unused) | 63.1 s cold (one speaker) · 0 s cached |
+| Voice processing / audio | 1.5 s (pitch only: no EQ, loudness or music) | 9.1 s (pitch, pace, music, ducking, loudness) |
+| Video | 2 h 5 min SadTalker + 1.4 s pad | 33.7 s render (motion 18.7, effects 5.8, colour convert 5.3, encoder wait 2.4) |
+| Peak RAM | 4.7 GB | 2.1 GB cold (during voice model) · 0.37 GB cached |
+| Output | 256×456, 0.45 MB, **needs manual editing** | **finished** 1080×1920 Short, 10 MB, 37.3 s, −14.0 LUFS / −1.0 dBTP |
+| Manual editing | captions, effects, music, loudness, 1080p export | none |
+
+Notes:
+- Peak RAM missed my 1.5 GB estimate: PyTorch doesn't hand back all memory after the voice model loads.
+- Ken Burns method chosen by measurement: 900 frames at 1080×1920 took 30 s wall / 123 s CPU with OpenCV bilinear (shudder 0.0029), vs 104 s / 146 s with visible shudder (0.0505) for a corrected ffmpeg `zoompan`. The commonly used zoompan recipe produced a **static** video. Pillow took over 30 min.
+- Pause between lines is 930 ms to match the published pacing. The old code added a hidden 454 ms of silence after every sentence (Coqui `tts()`), then slowed everything by 1.2×.
+- Two early runs stalled for ~20 minutes each. The event log shows Windows Modern Standby at exactly those times. The pipeline now asks Windows not to idle-sleep while it runs (`[run] keep_awake`).
+
+### What I'd improve next
+1. Run the voice model in a short-lived subprocess, so its ~1.7 GB is fully released before rendering (peak RAM ~1.3 GB).
+2. Move motion to the Iris Xe GPU (OpenCL/Vulkan warp). It's the largest remaining render cost (~19 s).
+3. Evaluate IndicF5 for a more natural voice, gated on a benchmark on this CPU.
+4. Automatic caption placement that avoids faces (a face detector on each baked image, once).
