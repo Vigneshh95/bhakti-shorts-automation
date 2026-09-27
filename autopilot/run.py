@@ -11,9 +11,10 @@ from pathlib import Path
 
 from autopilot import library, planner, writer, youtube
 from autopilot.http import ProviderError
-from autopilot.notify import notify
+from autopilot.notify import ask, notify
 from autopilot.script import Script
 from autopilot.settings import load_settings
+from shorts.config import ROOT
 from shorts.log import StageTimer, log
 
 
@@ -99,8 +100,10 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
                 signed_in = youtube.preflight(interactive)
                 if not signed_in:
                     log.warning("  YouTube sign-in has expired: making the video now; it will upload after you approve.")
-                    notify("Murugan Short: approve YouTube",
-                           "Today's Short is being made. Double-click auto_short.bat and approve in the browser to upload it.")
+                    msg = ("YouTube needs your approval to upload today's Murugan Short.\n\n"
+                           "Approve now? (Yes opens the Google page in your browser; the video uploads right after.)")
+                    notify("Murugan Short: approve YouTube", "Click Yes on the popup, or double-click auto_short.bat.")
+                    ask("Murugan Short: approve YouTube", msg, yes_command=str(ROOT / "auto_short.bat"), workdir=str(ROOT))
 
         with timer.stage("plan"):
             plan = planner.plan_day(day, settings, history)

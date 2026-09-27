@@ -180,7 +180,7 @@ def test_description_has_script_links_and_shorts_hashtag(settings):
 # --- full run --------------------------------------------------------------------------------
 
 def _fake_world(monkeypatch, settings, signed_in=True):
-    state = {"uploads": [], "renders": 0, "notes": []}
+    state = {"uploads": [], "renders": 0, "notes": [], "asks": []}
     _pic(settings["paths"]["image_folder"], "a.png", "orange")
     _pic(settings["paths"]["image_folder"], "b.png", "gold")
     monkeypatch.setattr(run_mod, "load_settings", lambda: settings)
@@ -203,6 +203,7 @@ def _fake_world(monkeypatch, settings, signed_in=True):
     monkeypatch.setattr(youtube, "preflight", lambda interactive: signed_in or interactive)
     monkeypatch.setattr(youtube, "upload", lambda v, sc, s, when, interactive: state["uploads"].append(when) or "VID123")
     monkeypatch.setattr(run_mod, "notify", lambda title, body: state["notes"].append(title))
+    monkeypatch.setattr(run_mod, "ask", lambda title, body, yes_command="", workdir="": state["asks"].append(yes_command))
     return state
 
 
@@ -225,6 +226,7 @@ def test_expired_sign_in_still_makes_video_then_uploads_after_approval(settings,
     rec = run_mod.run(date(2026, 9, 27), interactive=False)  # the morning scheduled run
     assert rec.get("pending_upload") and not st["uploads"] and st["renders"] == 1
     assert st["notes"] == ["Murugan Short: approve YouTube"]
+    assert st["asks"] and st["asks"][0].endswith("auto_short.bat")  # popup: "Yes" starts approval + upload
 
     rec2 = run_mod.run(date(2026, 9, 27), interactive=True)  # user double-clicks and approves
     assert rec2["video_id"] == "VID123" and len(st["uploads"]) == 1
