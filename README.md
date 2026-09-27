@@ -42,14 +42,18 @@ Installing on a new machine: `pip install -r requirements.txt`, unzip the gyan.d
 3. Drop one or more images in `episodes/2026-09-27/images/`. With 2+ images, the video
    switches image between sentences, using a transition.
 4. Optionally set a hook title in `episodes/2026-09-27/episode.toml`.
-5. Build it:
+5. Build it (the episode name alone is enough, from any folder):
    ```
-   make_short.bat episodes\2026-09-27
+   make_short.bat 2026-09-27
    ```
-   or `.venv\Scripts\python.exe -m shorts make episodes/2026-09-27 [--preset fast|balanced|best] [--voice baby|young_male|male]`
+   or `.venv\Scripts\python.exe -m shorts make 2026-09-27 [--preset fast|balanced|best] [--voice baby|young_male|male]`
 
 The result goes to `Final/muruganShorts_<date>.mp4`, with a matching `.txt` that the
-uploader uses for the title. Upload as before with `upload_short.bat`.
+uploader uses for the title. If a Short already exists for that date you'll see a
+warning, because it will be replaced. Use `--date` or `--output` to keep both.
+
+To upload in the same step, add `--upload`. To preview the YouTube title, tags and
+description without uploading, add `--upload-dry-run`. `upload_short.bat` still works as before.
 
 `episodes/sample-2026-03-08/` is a complete example (the lines from your 2026-03-08 Short).
 
@@ -172,5 +176,12 @@ stand-in voice so it finishes in seconds.
 
 ## Uploading
 
-`upload_short.bat` / `autouploadmurugan.py` are unchanged. They upload today's file from `Final/`
-and read the title highlight from the `.txt` the pipeline writes next to it.
+`upload_short.bat` / `autouploadmurugan.py` upload today's file from `Final/` and read the title
+highlight from the `.txt` the pipeline writes next to it. `make --upload` uses the same
+uploader, but uploads exactly the file just made.
+
+Metadata fixes made in the uploader:
+- corrected the description's "ஜெை" → "ஜெய் முருகன்"
+- removed numbered filler openers and tags ("Daily Boost #6", "MuruganTag5")
+- removed off-topic tags (தீபாவளி, திருப்பதி, கிளி…) and added Murugan-specific ones (தைப்பூசம், கந்த சஷ்டி, அறுபடை வீடு, பழனி…)
+- fixed the title-template list growing on every use

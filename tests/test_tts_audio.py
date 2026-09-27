@@ -62,3 +62,28 @@ def test_voice_filter_matches_the_original_baby_preset(cfg):
     assert "acompressor" not in f
     male = voice_filter(cfg["voice"]["styles"]["male"], 48000)
     assert "rubberband" not in male  # neutral pitch and pace: no pitch-shift pass at all
+
+
+def test_first_word_highlight_moves_to_where_speech_becomes_audible(tmp_path):
+    # FastPitch opens each line with a pause it counts as part of the first character
+    # (135-590 ms measured); without this the highlight ran up to 674 ms ahead of the voice.
+    from shorts.stages.tts import _snap_first_word_to_onset
+    sr = 22050
+    wav = np.concatenate([np.zeros(int(0.4 * sr)), 0.5 * np.sin(np.arange(int(0.6 * sr)) * 0.1)]).astype(np.float32)
+    p = tmp_path / "l.wav"
+    sf.write(p, wav, sr)
+    words = [Word("a", 0.0, 0.7), Word("b", 0.7, 1.0)]
+    _snap_first_word_to_onset(words, p)
+    assert abs(words[0].start - 0.36) < 0.01  # 400 ms onset minus the 40 ms lead
+    assert words[1].start == 0.7  # later words are already correct
+
+
+def test_onset_snap_never_moves_a_word_past_its_own_end(tmp_path):
+    from shorts.stages.tts import _snap_first_word_to_onset
+    sr = 22050
+    wav = np.concatenate([np.zeros(int(0.9 * sr)), np.ones(int(0.1 * sr))]).astype(np.float32)
+    p = tmp_path / "l.wav"
+    sf.write(p, wav, sr)
+    words = [Word("a", 0.0, 0.5)]
+    _snap_first_word_to_onset(words, p)
+    assert words[0].start == 0.0

@@ -300,6 +300,7 @@ Notes:
 - Peak RAM missed my 1.5 GB estimate: PyTorch doesn't hand back all memory after the voice model loads.
 - Ken Burns method chosen by measurement: 900 frames at 1080×1920 took 30 s wall / 123 s CPU with OpenCV bilinear (shudder 0.0029), vs 104 s / 146 s with visible shudder (0.0505) for a corrected ffmpeg `zoompan`. The commonly used zoompan recipe produced a **static** video. Pillow took over 30 min.
 - Pause between lines is 930 ms to match the published pacing. The old code added a hidden 454 ms of silence after every sentence (Coqui `tts()`), then slowed everything by 1.2×.
+- **Caption sync, measured on the final audio:** each line's highlight lands 33-53 ms before the voice (a natural lead). Before the fix it was 150-674 ms early, because FastPitch opens every line with a short pause that it counts as part of the first character. The audio is untouched; only the first word's highlight moves to the audible onset. Rubberband itself adds only about -45 ms.
 - Two early runs stalled for ~20 minutes each. The event log shows Windows Modern Standby at exactly those times. The pipeline now asks Windows not to idle-sleep while it runs (`[run] keep_awake`).
 
 ### What I'd improve next

@@ -27,6 +27,9 @@ def main(argv: list[str] | None = None) -> int:
     mk.add_argument("--voice", choices=["baby", "young_male", "male"])
     mk.add_argument("--date", help="date used in the output file name (default: today)")
     mk.add_argument("--output", type=Path, help="exact output path (default: Final/muruganShorts_<date>.mp4)")
+    up = mk.add_mutually_exclusive_group()
+    up.add_argument("--upload", action="store_true", help="upload to YouTube when done (autouploadmurugan.py)")
+    up.add_argument("--upload-dry-run", action="store_true", help="show the YouTube title/tags/description, don't upload")
 
     new = sub.add_parser("new", help="create an episode folder")
     new.add_argument("name")
@@ -39,8 +42,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "make":
             from shorts.pipeline import make_short
 
-            episode = args.episode if args.episode.is_absolute() else Path.cwd() / args.episode
-            make_short(episode, args.preset, args.date, args.voice, args.output)
+            episode = resolve_episode(args.episode)
+            result = make_short(episode, args.preset, args.date, args.voice, args.output)
+            if args.upload or args.upload_dry_run:
+                from shorts.upload import upload_video
+
+                upload_video(result.output, dry_run=args.upload_dry_run)
         elif args.cmd == "new":
             return _new_episode(args.name)
         elif args.cmd == "check":
@@ -52,6 +59,16 @@ def main(argv: list[str] | None = None) -> int:
         log.exception("Failed: %s", exc)
         return 1
     return 0
+
+
+def resolve_episode(arg: Path) -> Path:
+    """Accepts an absolute path, a path relative to where you are, a path relative to
+    this project ("episodes/2026-09-27"), or just the episode name ("2026-09-27") -- so
+    make_short.bat works no matter which folder it's started from."""
+    if arg.is_absolute():
+        return arg
+    candidates = [Path.cwd() / arg, ROOT / arg, load_config()["paths"]["episodes"] / arg]
+    return next((c for c in candidates if c.is_dir()), candidates[0])
 
 
 def _new_episode(name: str) -> int:

@@ -112,28 +112,30 @@ class MetadataGenerator:
 
     TAMIL_OPENERS = [
         "மிக முக்கியம்!", "முருகனின் அருள்", "இன்றைய ஆசீர்", "இந்த வாக்கியம் உங்கள் வாழ்வை மாற்றும்",
-        "செய்ய வேண்டியது ஒரு Sache", "ஆசீர்வாதம் பெறுங்கள்", "இன்றைய ஸ்பெஷல்", "உயிரின் வழி",
-        "எளிய சிந்தனை, பெரிய மாற்றம்", "முருகனின் சிந்தனை", "திருக்குரல்", "வெல் அருள்",
-        "நாளை நல்ல நாள்", "அருள் பெறு", "சில்முறை அறிவுரை", "இன்றைய ஆசிஷ்",
-    ] + [f"முருகன் அருள் {i}" for i in range(1, 21)]
+        "ஆசீர்வாதம் பெறுங்கள்", "இன்றைய ஸ்பெஷல்", "உயிரின் வழி",
+        "எளிய சிந்தனை, பெரிய மாற்றம்", "முருகனின் சிந்தனை", "திருக்குரல்", "வேல் அருள்",
+        "நாளை நல்ல நாள்", "அருள் பெறு", "சிறு அறிவுரை", "இன்றைய ஆசி",
+    ]
+    # Numbered fillers ("முருகன் அருள் 7", "Daily Boost #6", "MuruganTag5") were removed:
+    # they read as spam in titles and as tag stuffing to YouTube, and add no search value.
 
     ENGLISH_OPENERS = [
         "Must Watch!", "Daily Murugan Wisdom", "Quick Blessing", "Instant Calm", "Powerful Truth",
         "Life-Changing Verse", "Short Divine Tip", "Tiny Temple Teaching", "Blessing for Today",
         "Unlock Peace", "One Line That Helps", "Spiritual Boost", "Quick Murugan Advice",
-    ] + [f"Daily Boost #{i}" for i in range(1, 21)]
+    ]
 
     TAG_POOL_TAMIL = [
-        "முருகன்", "வெல்", "கார்த்திகேயன்", "சுப்பிரமணியர்", "திருமுருகன்", "தமிழ் பக்தி", "தீபம்",
-        "தீபாவளி", "பஜனை", "அருள்", "வீதி", "திருப்புகழ்", "அடை", "திருப்பதி", "கிளி",
-        "பூஜை", "அர்ச்சனா", "அருட்படை", "தை", "ஞானம்"
-    ] + [f"முருகன்{i}" for i in range(1, 6)]
+        "முருகன்", "வேல்", "கார்த்திகேயன்", "சுப்பிரமணியர்", "திருமுருகன்", "தமிழ் பக்தி", "தீபம்",
+        "பஜனை", "அருள்", "திருப்புகழ்", "பூஜை", "அர்ச்சனை", "அறுபடை வீடு", "ஞானம்",
+        "தைப்பூசம்", "கந்த சஷ்டி", "பழனி", "திருச்செந்தூர்", "வேல் முருகா", "கந்தன்",
+    ]
 
     TAG_POOL_EN = [
         "Murugan", "Vel", "Skanda", "Subramanya", "Kartikeya", "TamilBhakti", "Hinduism",
         "Devotional", "Temple", "Shorts", "Spirituality", "Prayer", "Meditation", "Blessing",
-        "DailyShorts", "Inspiration", "BhaktiSongs", "TamilShorts", "Religious"
-    ] + [f"MuruganTag{i}" for i in range(1, 8)]
+        "DailyShorts", "Inspiration", "BhaktiSongs", "TamilShorts", "Religious",
+    ]
 
     def __init__(self, config: Config):
         self.config = config
@@ -146,16 +148,17 @@ class MetadataGenerator:
     def _build_title_pool(self):
         """Generates a large, unique pool of title templates."""
         pool = set()
-        # Add permutations
-        self.TITLE_TEMPLATES.extend([
+        # Add permutations (to a copy: extending the class-level list itself made it grow
+        # by 4 entries every time a MetadataGenerator was created)
+        templates = self.TITLE_TEMPLATES + [
             "{tamil_opener} | {highlight} — {eng_opener}",
             "{eng_opener} — {highlight} | {tamil_opener}",
             "{tamil_opener} — {highlight} | #முருகன்",
             "{eng_opener} | {highlight} | Temple Short",
-        ])
+        ]
 
         for _ in range(400):  # Generate a large number of variations
-            template = random.choice(self.TITLE_TEMPLATES)
+            template = random.choice(templates)
             formatted_template = template.format(
                 opener=random.choice(self.TAMIL_OPENERS + self.ENGLISH_OPENERS),
                 tamil_opener=random.choice(self.TAMIL_OPENERS),
@@ -216,7 +219,7 @@ class MetadataGenerator:
         description_parts = [
             f"{title}\n",
             f"{highlight}\n",
-            "🌸 ஜெை முருகன்! வீடியோவை பகிரவும், லைக் செய்யவும் மற்றும் சப்ஸ்கிரைப் செய்யவும்.",
+            "🌸 ஜெய் முருகன்! வீடியோவை பகிரவும், லைக் செய்யவும் மற்றும் சப்ஸ்கிரைப் செய்யவும்.",
             "🌟 Daily Murugan blessings in Tamil — Subscribe for more temple shorts.\n",
             f"🎯 Tags/Keywords: {tag_string}\n",
             "👇 Follow & Support",

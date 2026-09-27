@@ -168,8 +168,34 @@ def synthesize_lines(lines: list[str], speaker: str, voice: FastPitchVoice, cach
             meta = {"sample_rate": sr, "duration": len(wav) / sr,
                     "words": [[w.text, w.start, w.end] for w in words]}
             meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+        words = [Word(t, s, e) for t, s, e in meta["words"]]
+        _snap_first_word_to_onset(words, wav_path)
         results.append(LineAudio(
-            text=text, wav_path=wav_path, sample_rate=meta["sample_rate"], duration=meta["duration"],
-            words=[Word(t, s, e) for t, s, e in meta["words"]],
+            text=text, wav_path=wav_path, sample_rate=meta["sample_rate"], duration=meta["duration"], words=words,
         ))
     return results
+
+
+def _audible_onset(wav: np.ndarray, sr: int, rel_db: float = -30.0, frame_s: float = 0.005) -> float:
+    hop = max(1, int(sr * frame_s))
+    n = len(wav) // hop
+    if n == 0:
+        return 0.0
+    rms = np.sqrt((wav[: n * hop].reshape(n, hop) ** 2).mean(axis=1))
+    loud = np.nonzero(rms > rms.max() * 10 ** (rel_db / 20))[0]
+    return float(loud[0] * frame_s) if len(loud) else 0.0
+
+
+def _snap_first_word_to_onset(words: list[Word], wav_path: Path) -> None:
+    """FastPitch opens each line with a short pause (measured 135-590 ms on the sample
+    episode) and counts it as part of the first character, so the first word's
+    highlight would light up that long before the word is heard. Move its start to
+    where the audio actually becomes audible (minus a 40 ms lead, so the highlight
+    arrives just ahead of the sound, as viewers expect). The audio itself is untouched."""
+    if not words:
+        return
+    wav, sr = sf.read(wav_path, dtype="float32")
+    onset = _audible_onset(wav, sr) - 0.04
+    first = words[0]
+    if first.start < onset < first.end - 0.05:
+        first.start = onset

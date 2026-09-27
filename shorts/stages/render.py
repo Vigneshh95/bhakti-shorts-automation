@@ -13,6 +13,7 @@ from pathlib import Path
 import cv2
 
 from shorts import ffmpeg
+from shorts.config import ROOT
 from shorts.effects import Effect, RenderContext
 from shorts.log import log
 from shorts.stages import visuals
@@ -51,9 +52,12 @@ def render(segments: list[visuals.Segment], effects: list[Effect], ass_path: Pat
     video_chain = ",".join(vf)
     overlay = fx["particles"].get("overlay") if fx["particles"]["enabled"] else ""
     if overlay:
-        inputs += ["-stream_loop", "-1", "-i", str(Path(overlay).resolve())]
-        graph = (f"[2:v]scale={W}:{H},format=yuv420p[ov];[0:v][ov]blend=all_mode=screen:shortest=1,"
-                 f"{video_chain}[v];[1:a]{','.join(af)}[a]")
+        overlay_path = Path(overlay) if Path(overlay).is_absolute() else ROOT / overlay  # same rule as [paths]
+        if not overlay_path.exists():
+            raise FileNotFoundError(f"[effects.particles] overlay not found: {overlay_path}")
+        inputs += ["-stream_loop", "-1", "-i", str(overlay_path)]
+        graph = (f"[2:v]fps={fps},scale={W}:{H},format=yuv420p,setsar=1[ov];[0:v]setsar=1[base];"
+                 f"[base][ov]blend=all_mode=screen:shortest=1,{video_chain}[v];[1:a]{','.join(af)}[a]")
     else:
         graph = f"[0:v]{video_chain}[v];[1:a]{','.join(af)}[a]"
 
@@ -92,7 +96,9 @@ def render(segments: list[visuals.Segment], effects: list[Effect], ass_path: Pat
                     last = pct
                     rate = (i + 1) / max(time.perf_counter() - t0, 1e-6)
                     log.info("  rendering %3d%%  (%d/%d frames, %.0f fps)", pct, i + 1, n, rate)
-        except BrokenPipeError:
+        except OSError:
+            # ffmpeg exited mid-stream (Windows reports this as OSError/EINVAL, not only
+            # BrokenPipeError). Its own error message, reported below, is the useful one.
             pass
         finally:
             if proc.stdin:

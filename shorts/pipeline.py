@@ -102,6 +102,8 @@ def make_short(episode_dir: Path, preset: str | None = None, out_date: str | Non
     out_dir = cfg["paths"]["output"]
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = output or out_dir / cfg["video"]["filename"].format(date=out_date or date.today().isoformat())
+    if out_path.exists():
+        log.warning("%s already exists and will be replaced (use --date or --output to keep both)", out_path.name)
 
     with KeepAwake(cfg["run"].get("keep_awake", True)), PeakMemory() as mem:
         with timer.stage("script"):
