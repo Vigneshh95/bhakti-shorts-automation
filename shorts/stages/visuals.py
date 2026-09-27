@@ -29,6 +29,7 @@ class Segment:
     zoom_to: float
     pan: tuple[float, float]  # fraction of the headroom margin to drift across (x, y)
     loop: bool = False  # go there and back, so the last frame matches the first (seamless replay)
+    video: object = None  # optional talking.FrameSource: animated frames replace the still picture
 
 
 def bake_image(src: Path, cfg: dict, effects: list[Effect], cache: Cache) -> np.ndarray:
@@ -98,14 +99,19 @@ def _warp(seg: Segment, t: float, W: int, H: int) -> np.ndarray:
     raw = min(max((t - seg.start) / span, 0.0), 1.0)
     p = 0.5 - 0.5 * np.cos(2 * np.pi * raw) if seg.loop else _ease(raw)  # loop: 0 -> 1 -> 0, smooth at both ends
     z = seg.zoom_from + (seg.zoom_to - seg.zoom_from) * p
-    MH, MW = seg.image.shape[:2]
+    image = seg.image
+    if seg.video is not None:
+        frame = seg.video.at(t)
+        if frame is not None:
+            image = frame
+    MH, MW = image.shape[:2]
     zf = z * W / MW
     margin_x = (MW * zf - W) / 2 / zf  # how far (in source px) the view can drift at this zoom
     margin_y = (MH * zf - H) / 2 / zf
     cx = MW / 2 + seg.pan[0] * margin_x * (p - 0.5) * 2
     cy = MH / 2 + seg.pan[1] * margin_y * (p - 0.5) * 2
     m = np.float32([[zf, 0, W / 2 - cx * zf], [0, zf, H / 2 - cy * zf]])
-    return cv2.warpAffine(seg.image, m, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    return cv2.warpAffine(image, m, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
 
 
 def frames(segments: list[Segment], W: int, H: int, fps: int, duration: float, transition: dict):

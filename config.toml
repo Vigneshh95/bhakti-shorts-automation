@@ -144,6 +144,18 @@ enabled = true
 in_s = 0.4
 out_s = 0.6
 
+[talking]
+enabled = false                       # SadTalker talking face (lips, blinks, head motion). ~2 h on this CPU; cached
+python = ".sadtalker_env/Scripts/python.exe"
+dir = "SadTalker"
+preprocess = "full"                   # animate the face and paste it back into the whole picture
+still = true                          # keep the pose close to the picture (less head movement)
+size = 256                            # face render size (512 is sharper but ~4x slower)
+expression_scale = 1.0
+batch_size = 2
+pose_style = 0
+enhancer = ""                         # "gfpgan" sharpens the face but adds a lot of CPU time
+
 # Speed-vs-quality presets: each overrides the settings above.
 [presets.fast]
 video = { quality = 27 }

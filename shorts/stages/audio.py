@@ -33,6 +33,7 @@ class AudioResult:
     words: list[TimedWord]
     line_spans: list[tuple[float, float]]  # (start, end) of each spoken line on the final timeline
     loudnorm_filter: str  # second-pass loudnorm with the measured values baked in
+    voice_path: Path | None = None  # processed voice alone, same timeline (drives the talking head)
 
 
 def build_voice_track(lines: list[LineAudio], voice_cfg: dict, pace: float, out_path: Path):
@@ -104,7 +105,12 @@ def make_audio(lines: list[LineAudio], cfg: dict, work: Path) -> AudioResult:
         args = ["-i", str(raw), "-af", vf]
     ffmpeg.run(ff, [*args, "-t", f"{duration:.3f}", "-ac", "2", "-c:a", "pcm_f32le", str(mix)])
 
-    return AudioResult(mix, duration, words, spans, _measure_loudnorm(ff, mix, audio_cfg))
+    voice_only = None
+    if cfg.get("talking", {}).get("enabled"):
+        # SadTalker reads 16 kHz mono; music would only confuse the lip movements
+        voice_only = work / "voice_16k.wav"
+        ffmpeg.run(ff, ["-i", str(raw), "-af", vf, "-t", f"{duration:.3f}", "-ac", "1", "-ar", "16000", str(voice_only)])
+    return AudioResult(mix, duration, words, spans, _measure_loudnorm(ff, mix, audio_cfg), voice_only)
 
 
 def _measure_loudnorm(ff: Path, mix: Path, audio_cfg: dict) -> str:

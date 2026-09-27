@@ -17,7 +17,7 @@ from shorts.config import load_config
 from shorts.effects import enabled_effects
 from shorts.log import StageTimer, log
 from shorts.stages import audio as audio_stage
-from shorts.stages import captions, render, script, tts, visuals
+from shorts.stages import captions, render, script, talking, tts, visuals
 
 
 @dataclass
@@ -130,6 +130,16 @@ def make_short(episode_dir: Path, preset: str | None = None, out_date: str | Non
             images = [visuals.bake_image(p, cfg, effects, cache) for p in ep.images]
             segments = visuals.plan_segments(images, aud.line_spans, aud.duration, cfg["effects"]["kenburns"],
                                              cfg["effects"]["kenburns"].get("seed", 7))
+
+        if cfg.get("talking", {}).get("enabled"):
+            with timer.stage("talking head"):
+                if len(images) != 1:
+                    log.warning("  talking head needs exactly one picture (this episode has %d); skipped", len(images))
+                else:
+                    video = talking.animate(images[0], aud.voice_path, cfg, cache, work)
+                    if video:
+                        h, w = images[0].shape[:2]
+                        segments[0].video = talking.FrameSource(video, (w, h))
 
         with timer.stage("render"):
             enc_name = render.render(segments, effects, ass, aud, cfg, work, out_path)

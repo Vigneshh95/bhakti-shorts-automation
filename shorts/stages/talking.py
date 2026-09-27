@@ -1,0 +1,106 @@
+"""Talking-head stage (optional, [talking] in config.toml): SadTalker animates the face in the
+picture -- lips in sync with the processed voice, blinks, gentle head motion -- and pastes it
+back into the full picture at its own resolution. Our renderer then applies motion, captions
+and effects on top of that video exactly as it does for a still picture.
+
+SadTalker runs in its own Python environment (.sadtalker_env) on the CPU and is slow (about
+2 hours for a 40-second Short on this laptop), so its result is cached: a re-render or a
+retry of the same day never repeats it. If it fails (e.g. no face found in the picture), the
+Short is made from the still picture instead of being lost."""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+from shorts.cache import Cache
+from shorts.config import ROOT
+from shorts.log import log
+
+TALKING_VERSION = "1"
+
+
+def _resolve(p: str) -> Path:
+    return Path(p) if Path(p).is_absolute() else ROOT / p
+
+
+def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work: Path) -> Path | None:
+    """picture: the baked RGB image the renderer would otherwise use. Returns the talking
+    video (same size as the picture), or None if SadTalker isn't available or failed."""
+    t = cfg["talking"]
+    python, sadtalker = _resolve(t["python"]), _resolve(t["dir"])
+    if not python.exists() or not (sadtalker / "inference.py").exists():
+        log.warning("  talking head skipped: SadTalker not found at %s", sadtalker)
+        return None
+
+    src = work / "talking_source.png"
+    cv2.imwrite(str(src), cv2.cvtColor(picture, cv2.COLOR_RGB2BGR))
+    options = {k: t[k] for k in ("size", "still", "preprocess", "expression_scale", "enhancer", "batch_size", "pose_style")}
+    key = cache.key("talking", TALKING_VERSION, src, voice_wav, options)
+    out, hit = cache.lookup("talking", key, ".mp4")
+    if hit:
+        log.info("  talking head: reusing the cached animation")
+        return out
+
+    result_dir = work / "sadtalker"
+    shutil.rmtree(result_dir, ignore_errors=True)
+    result_dir.mkdir(parents=True)
+    cmd = [str(python), str(sadtalker / "inference.py"), "--driven_audio", str(voice_wav.resolve()),
+           "--source_image", str(src.resolve()), "--result_dir", str(result_dir.resolve()), "--cpu",
+           "--preprocess", t["preprocess"], "--size", str(t["size"]), "--expression_scale", str(t["expression_scale"]),
+           "--batch_size", str(t["batch_size"]), "--pose_style", str(t["pose_style"])]
+    if t["still"]:
+        cmd.append("--still")
+    if t["enhancer"]:
+        cmd += ["--enhancer", t["enhancer"]]
+
+    log.info("  animating the face with SadTalker (slow on CPU: about 2 hours for a 40 s Short)…")
+    log_path = work / "sadtalker.log"
+    t0 = time.perf_counter()
+    with open(log_path, "w", encoding="utf-8", errors="replace") as lf:
+        proc = subprocess.Popen(cmd, cwd=sadtalker, stdout=lf, stderr=subprocess.STDOUT)
+        last = 0.0
+        while proc.poll() is None:
+            time.sleep(15)
+            if time.perf_counter() - last > 600:  # a progress line every 10 minutes
+                last = time.perf_counter()
+                log.info("  …SadTalker still working (%d min so far)", (last - t0) // 60)
+    videos = sorted(result_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+    if proc.returncode != 0 or not videos:
+        tail = "\n".join(log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-6:])
+        log.warning("  SadTalker failed (exit %s); using the still picture instead. Last lines:\n%s", proc.returncode, tail)
+        return None
+    shutil.copyfile(videos[-1], out)
+    log.info("  talking head done in %.0f min", (time.perf_counter() - t0) / 60)
+    return out
+
+
+class FrameSource:
+    """Reads a talking video's frames in order, matched to the renderer's timeline and resized
+    to the picture's size if SadTalker rounded it."""
+
+    def __init__(self, path: Path, size: tuple[int, int]):
+        self.cap = cv2.VideoCapture(str(path))
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 25.0
+        self.count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.size = size  # (width, height)
+        self.index, self.current = -1, None
+
+    def at(self, t: float) -> np.ndarray | None:
+        want = min(int(round(t * self.fps)), max(self.count - 1, 0))
+        while self.index < want:
+            ok, frame = self.cap.read()
+            if not ok:
+                break  # past the end: keep showing the last frame
+            self.index += 1
+            self.current = frame
+        if self.current is None:
+            return None
+        rgb = cv2.cvtColor(self.current, cv2.COLOR_BGR2RGB)
+        if (rgb.shape[1], rgb.shape[0]) != self.size:
+            rgb = cv2.resize(rgb, self.size, interpolation=cv2.INTER_LINEAR)
+        return rgb

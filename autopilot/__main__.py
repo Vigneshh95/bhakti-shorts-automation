@@ -92,7 +92,7 @@ def _schedule(action: str) -> int:
               f"-WorkingDirectory '{ROOT}';"
               f"$t = New-ScheduledTaskTrigger -Daily -At '{at}';"
               "$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries "
-              "-AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 2);"
+              "-AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6);"
               f"Register-ScheduledTask -TaskName '{name}' -Action $a -Trigger $t -Settings $s "
               "-Description 'Makes and schedules the daily Murugan Short (autopilot)' -Force | Out-Null")
     elif action == "remove":

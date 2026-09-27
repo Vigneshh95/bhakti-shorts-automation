@@ -55,6 +55,7 @@ name_en = "Karthigai Deepam"
 [look]                              # extra effects for autopilot videos only (manual workflow unaffected)
 loop = true                         # motion returns to its start: seamless replays
 glow_pulse = true                   # soft "breathing" divine light around the subject
+talking = true                      # SadTalker: Murugan's lips move with the words (~2 h per Short on this CPU, cached)
 
 [youtube]
 publish_time = "18:30"              # IST. The Short is uploaded now but goes public at this time (next day if it has passed)

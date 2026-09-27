@@ -84,7 +84,9 @@ def _episode_toml(script: Script, look: dict) -> str:
             f"[effects.glow_pulse]\nenabled = {str(look.get('glow_pulse', True)).lower()}\n\n"
             # Open on the picture itself (the first frame is what stops the scroll) and don't fade
             # to black at the end, which would break the seamless loop.
-            f"[effects.fade]\nenabled = {str(not loop).lower()}\n")
+            f"[effects.fade]\nenabled = {str(not loop).lower()}\n\n"
+            # Murugan's lips move with the words (SadTalker; slow, cached)
+            f"[talking]\nenabled = {str(look.get('talking', True)).lower()}\n")
 
 
 def run(day: date | None = None, upload: bool = True, publish_now: bool = False, force: bool = False,

@@ -100,3 +100,46 @@ def test_missing_overlay_file_is_a_clear_error(episode, monkeypatch, fake_voice)
     monkeypatch.setattr(pipeline.tts, "FastPitchVoice", lambda *a, **k: fake_voice)
     with pytest.raises(FileNotFoundError, match="overlay not found"):
         pipeline.make_short(episode, out_date="2026-01-04")
+
+
+def _talking_clip(path, seconds=3, size="1210x2150"):
+    # a stand-in "talking" video: FFmpeg's animated test pattern, which changes every frame
+    subprocess.run([str(ROOT / "tools/ffmpeg/bin/ffmpeg.exe"), "-v", "error", "-y", "-f", "lavfi", "-i",
+                    f"testsrc2=s={size}:d={seconds}:r=25", "-pix_fmt", "yuv420p", str(path)], check=True)
+    return path
+
+
+def test_talking_video_frames_replace_the_still_picture(tmp_path):
+    from shorts.stages import talking, visuals
+    clip = _talking_clip(tmp_path / "talk.mp4")
+    src = talking.FrameSource(clip, (1210, 2150))
+    a, b = src.at(0.0), src.at(2.0)
+    assert a.shape == (2150, 1210, 3) and np.abs(a.astype(int) - b.astype(int)).mean() > 1
+    still = np.zeros((2150, 1210, 3), np.uint8)
+    segs = visuals.plan_segments([still], [(0, 3)], 3.0, {"zoom": 0.0, "pan": 0.0}, seed=1)
+    segs[0].video = talking.FrameSource(clip, (1210, 2150))
+    frames = [f for _, f in visuals.frames(segs, 1080, 1920, 5, 3.0, {"enabled": False})]
+    assert frames[0].max() > 0  # the talking video's frames are used, not the black still picture
+    assert np.abs(frames[0].astype(int) - frames[-1].astype(int)).mean() > 1  # and they change over time
+
+
+def test_talking_head_enabled_end_to_end_and_falls_back_if_it_fails(episode, tmp_path, monkeypatch, fake_voice):
+    from shorts.stages import talking
+    (episode / "images" / "b.png").unlink()  # the talking head works on one picture
+    p = episode / "episode.toml"
+    p.write_text(p.read_text(encoding="utf-8") + "[talking]\nenabled = true\n", encoding="utf-8")
+    monkeypatch.setattr(pipeline.tts, "FastPitchVoice", lambda *a, **k: fake_voice)
+    seen = {}
+
+    def fake_animate(picture, voice_wav, cfg, cache, work):
+        seen["voice"] = voice_wav
+        h, w = picture.shape[:2]
+        return _talking_clip(tmp_path / "t.mp4", seconds=4, size=f"{w}x{h}")
+
+    monkeypatch.setattr(talking, "animate", fake_animate)
+    res = pipeline.make_short(episode, out_date="2026-01-05")
+    assert "talking head" in res.stage_times and res.output.exists()
+    assert seen["voice"].name == "voice_16k.wav" and seen["voice"].exists()  # voice-only track drives the lips
+
+    monkeypatch.setattr(talking, "animate", lambda *a, **k: None)  # SadTalker failed: still picture instead
+    assert pipeline.make_short(episode, out_date="2026-01-06").output.exists()
