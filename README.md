@@ -205,13 +205,16 @@ It never changes the manual workflow. Its videos go to `Final/auto/`.
 | Action | How |
 |---|---|
 | Add pictures | copy .jpg/.png files into `daily_images/` (at least 700 px on the short side) |
-| One click | double-click `auto_short.bat` |
-| Preview (no upload) | `auto_short.bat --no-upload` |
+| **1. Preview** (make it, don't upload; opens the video) | double-click `preview_short.bat` |
+| **2. Upload** (reuses the previewed video) | double-click `auto_short.bat` |
 | Go public immediately | `auto_short.bat --publish-now` |
 | Check keys, pictures and YouTube sign-in | `.venv\Scripts\python.exe -m autopilot check` |
 | Daily automatic run | `.venv\Scripts\python.exe -m autopilot schedule install` (`remove` / `status`) |
 
 Each day's files are in `episodes/auto/<date>/`: the script, a copy of the chosen picture, and `run.log`.
+
+From a PowerShell terminal in another folder, run the files by their full path:
+`& "C:hakthishortshakti-shorts-automation\Murugan\preview_short.bat"` (a bare `auto_short.bat` only works inside the Murugan folder).
 
 ## When the YouTube sign-in expires
 

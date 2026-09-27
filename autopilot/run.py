@@ -65,6 +65,13 @@ def _write_patiently(plan, settings: dict, history, pictures, interactive: bool)
     raise AssertionError("unreachable")
 
 
+def _write_if_changed(path: Path, text: str) -> None:
+    """Rewriting an identical file would make the finished video look out of date and
+    trigger a needless re-render; only write when the content actually changes."""
+    if not path.exists() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8")
+
+
 def _episode_toml(script: Script, look: dict) -> str:
     """Turns on the autopilot's look for this episode only (config.toml defaults stay off, so
     the manual workflow is unchanged)."""
@@ -144,8 +151,8 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
             for line in script.lines:
                 log.info("    %s", line)
 
-        (ep_dir / "lines.txt").write_text("\n".join(script.lines) + "\n", encoding="utf-8")
-        (ep_dir / "episode.toml").write_text(_episode_toml(script, settings.get("look", {})), encoding="utf-8")
+        _write_if_changed(ep_dir / "lines.txt", "\n".join(script.lines) + "\n")
+        _write_if_changed(ep_dir / "episode.toml", _episode_toml(script, settings.get("look", {})))
 
         out = settings["paths"]["output"] / f"muruganAuto_{day.isoformat()}.mp4"
         with timer.stage("video"):
