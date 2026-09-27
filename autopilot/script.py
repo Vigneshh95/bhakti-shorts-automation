@@ -1,0 +1,152 @@
+"""What the writer model must return, the prompt that asks for it, and the checks that decide
+whether it's safe to publish. The same prompt/schema/validation is used for every provider."""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from autopilot.planner import Plan
+
+SCHEMA = {
+    "type": "object",
+    "properties": {
+        "lines": {"type": "array", "items": {"type": "string"}},
+        "hook_title": {"type": "string"},
+        "image_prompt": {"type": "string"},
+        "youtube_title": {"type": "string"},
+        "youtube_description": {"type": "string"},
+        "hashtags": {"type": "array", "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["lines", "hook_title", "image_prompt", "youtube_title", "youtube_description", "hashtags", "tags"],
+    "additionalProperties": False,
+}
+
+REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {"ok": {"type": "boolean"}, "issues": {"type": "array", "items": {"type": "string"}}},
+    "required": ["ok", "issues"],
+    "additionalProperties": False,
+}
+
+SYSTEM = """You write daily YouTube Shorts for the Tamil devotional channel "{channel}".
+Format: Lord Murugan speaks a short message of wisdom directly to the viewer, narrated in Tamil
+over a devotional image, with word-by-word captions. About 30-40 seconds.
+
+Write for real reach AND for respect:
+- lines: {lmin}-{lmax} short Tamil sentences, spoken by Murugan to "நீ"/"உன்". Line 1 is a hook
+  that makes the viewer stay (e.g. "முருகன் சொல்வது." or a striking first statement). The last
+  line is a blessing. Simple, warm, spoken Tamil (a text-to-speech voice will read it).
+  Tamil script ONLY: no English letters, no digits (write numbers as Tamil words), no emoji,
+  no quotation marks. Each line at most {maxc} characters and ends with a full stop.
+- Practical, positive guidance. Never: promises of miracles, money or cures; medical, legal or
+  financial advice; quotes attributed to scriptures or real people; mocking any person or faith;
+  fear or guilt tactics; claims that a festival is today unless the context says so.
+- hook_title: 2-4 Tamil words shown on screen for the first seconds.
+- image_prompt (English): one devotional scene that fits today's message. Lord Murugan in
+  traditional iconography (vel, peacock, crown, often as Bala Murugan, the child form) with
+  temple / hills / nature, glowing divine light, rich warm colours, detailed devotional digital
+  painting, vertical 9:16 composition, main subject in the upper two-thirds (captions cover the
+  bottom). Absolutely no text, letters or watermarks in the image. Respectful and dignified.
+- youtube_title: at most 70 characters. Start with the Tamil keyword (முருகன் ...) and today's
+  message, then a short English part, e.g. "முருகன் அருள் வாக்கு | Courage in Hard Times".
+  Honest, no clickbait, no ALL CAPS, no hashtags in the title.
+- youtube_description: 2-3 natural Tamil sentences about the message, then 1 English sentence,
+  naturally using searched words (Murugan, முருகன், Tamil devotional, today's theme).
+- hashtags: 3-5, each starting with #, e.g. #முருகன் #Murugan and one theme hashtag.
+- tags: 10-20 relevant search phrases, Tamil and English, only about Murugan / Tamil devotion /
+  today's theme. No numbers-only or filler tags.
+Return only JSON matching the schema."""
+
+REVIEW_SYSTEM = """You are a careful Tamil editor and reviewer for a respectful Hindu devotional
+YouTube channel about Lord Murugan. Check the script and metadata below and return ok=false with
+specific issues if ANY of these hold: incorrect or unnatural Tamil; anything disrespectful to
+Murugan, Hinduism or any faith; false or unverifiable claims (dates, scripture quotes, miracles,
+cures, money); medical, legal or financial advice; misleading or clickbait title; image prompt
+that could produce an undignified depiction. Minor stylistic preferences are not issues."""
+
+_TAMIL_LINE = re.compile(r"^[஀-௿\s.,;!?‌‍-]+$")
+
+
+@dataclass
+class Script:
+    lines: list[str]
+    hook_title: str
+    image_prompt: str
+    youtube_title: str
+    youtube_description: str
+    hashtags: list[str]
+    tags: list[str]
+    provider: str = ""
+    review_issues: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {k: getattr(self, k) for k in (
+            "lines", "hook_title", "image_prompt", "youtube_title", "youtube_description", "hashtags", "tags",
+            "provider", "review_issues")}
+
+
+def build_prompt(plan: Plan, settings: dict, recent_titles: list[str]) -> tuple[str, str]:
+    c = settings["content"]
+    system = SYSTEM.format(channel=c["channel_name"], lmin=c["lines_min"], lmax=c["lines_max"], maxc=c["max_line_chars"])
+    user = plan.context()
+    if recent_titles:
+        user += "\nRecent titles on the channel (write something clearly different):\n- " + "\n- ".join(recent_titles[-10:])
+    return system, user
+
+
+def validate(data: dict, settings: dict) -> list[str]:
+    """Problems that would make the Short fail or look bad; empty list = publishable."""
+    c = settings["content"]
+    errors = []
+    lines = [l.strip() for l in data.get("lines", []) if l and l.strip()]
+    if not c["lines_min"] <= len(lines) <= c["lines_max"]:
+        errors.append(f"need {c['lines_min']}-{c['lines_max']} lines, got {len(lines)}")
+    for i, line in enumerate(lines, 1):
+        if not _TAMIL_LINE.match(line):
+            errors.append(f"line {i} has non-Tamil characters (only Tamil script allowed): {line}")
+        if len(line) > c["max_line_chars"]:
+            errors.append(f"line {i} is {len(line)} characters (max {c['max_line_chars']})")
+    title = data.get("youtube_title", "").strip()
+    if not 10 <= len(title) <= 70:
+        errors.append(f"youtube_title must be 10-70 characters, got {len(title)}")
+    if "#" in title:
+        errors.append("youtube_title must not contain hashtags")
+    if "முருக" not in title and "Murugan" not in title:
+        errors.append("youtube_title must contain முருகன் or Murugan")
+    tags = data.get("hashtags", [])
+    if not 3 <= len(tags) <= 5 or not all(t.startswith("#") and " " not in t for t in tags):
+        errors.append("hashtags: 3-5 items, each like #Word (no spaces)")
+    if len(data.get("tags", [])) < 5:
+        errors.append("tags: at least 5 search phrases")
+    if len(data.get("image_prompt", "")) < 40:
+        errors.append("image_prompt is too short to describe a scene")
+    if not data.get("hook_title", "").strip():
+        errors.append("hook_title is empty")
+    return errors
+
+
+def to_script(data: dict, provider: str) -> Script:
+    return Script(
+        lines=[l.strip() for l in data["lines"] if l.strip()],
+        hook_title=data["hook_title"].strip(),
+        image_prompt=data["image_prompt"].strip(),
+        youtube_title=data["youtube_title"].strip(),
+        youtube_description=data["youtube_description"].strip(),
+        hashtags=[h.strip() for h in data["hashtags"]],
+        tags=_clean_tags(data["tags"]),
+        provider=provider,
+    )
+
+
+def _clean_tags(tags: list[str]) -> list[str]:
+    out, total = [], 0
+    for t in tags:
+        t = t.strip().lstrip("#")
+        if not t or t.isdigit() or t in out:
+            continue
+        if total + len(t) + 1 > 450:  # YouTube's tag budget is 500 characters
+            break
+        out.append(t)
+        total += len(t) + 1
+    return out

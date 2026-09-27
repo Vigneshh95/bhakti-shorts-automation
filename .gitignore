@@ -35,3 +35,7 @@ ta/
 *.pt
 *.ckpt
 *.safetensors
+
+# autopilot: daily generated episodes, run history, fallback-image copies
+episodes/auto/
+assets/auto_images/

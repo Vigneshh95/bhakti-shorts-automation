@@ -185,3 +185,55 @@ Metadata fixes made in the uploader:
 - removed numbered filler openers and tags ("Daily Boost #6", "MuruganTag5")
 - removed off-topic tags (தீபாவளி, திருப்பதி, கிளி…) and added Murugan-specific ones (தைப்பூசம், கந்த சஷ்டி, அறுபடை வீடு, பழனி…)
 - fixed the title-template list growing on every use
+
+---
+
+# Autopilot: fully automatic Shorts (one click or daily)
+
+A second, separate workflow. It does everything on its own:
+1. Picks today's topic: a listed festival, then Tuesday (Murugan's day), then a rotating theme not used recently.
+2. Writes the Tamil script and the YouTube title, description, hashtags and tags with an AI writer. Each draft is validated, then reviewed by a second AI pass for Tamil quality, respect and honesty. Nothing unreviewed is published.
+3. Creates a matching devotional image with AI, with no text in the image.
+4. Makes the video with the same engine as above (voice, captions, effects).
+5. Uploads to YouTube, scheduled to go public at the evening slot (18:30 IST by default), with the AI-content disclosure set, then adds it to your playlist.
+
+It never touches the manual workflow. Its videos go to `Final/auto/`, so `upload_short.bat` can't pick them up.
+
+## Use it
+
+| Action | How |
+|---|---|
+| One click | double-click `auto_short.bat` |
+| Preview (no upload) | `auto_short.bat --no-upload` |
+| Go public immediately | `auto_short.bat --publish-now` |
+| Check keys and YouTube sign-in | `.venv\Scripts\python.exe -m autopilot check` |
+| Daily automatic run | `.venv\Scripts\python.exe -m autopilot schedule install` (`remove` / `status`) |
+
+Each day's files are kept in `episodes/auto/<date>/`: the script, image and `run.log`.
+
+The autopilot is safe to click twice. It uploads at most once a day (`max_uploads_per_day`), and if a run fails part-way, the next run reuses that day's reviewed script and image.
+
+## Providers (autopilot.toml)
+
+| | Options | Needs |
+|---|---|---|
+| Writer | `gemini` (default), `claude`, `openai` | `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` (+ `pip install anthropic`) / `OPENAI_API_KEY` in `.env` |
+| Image | `gemini` (default), `openai`, `folder` | Gemini or OpenAI images need billing enabled; `folder` uses `assets/auto_images/` |
+
+Claude writes text only; it doesn't generate images.
+
+Fallbacks for unattended runs:
+- An overloaded model switches to the next one in `gemini_text_fallback`.
+- A writer that's down switches to `fallback_writer`.
+- A failed image uses `fallback_image`.
+- Scheduled runs wait out short outages (`outage_retries`, `outage_wait_minutes`).
+- Quota and billing errors are recognised and not retried pointlessly.
+
+Costs: the Gemini text free tier allows 20 requests a day per model, and a run needs 2–6. Gemini images cost about $0.04 (~₹3.3) each.
+
+## One-time setup for reliable daily uploads
+
+1. **Enable billing** on the Gemini key (Google AI Studio → Billing). Without it, images come from `assets/auto_images/` instead.
+2. **Sign in to YouTube once.** Double-click `auto_short.bat`; the browser opens and you approve. Scheduled runs can't open a browser, so they stop with a clear message if the sign-in expires.
+3. **Keep the sign-in from expiring.** In Google Cloud Console → *Google Auth Platform → Audience*, set the app's publishing status to **In production**. Apps left in *Testing* have their sign-in expire every **7 days**, which would stop daily uploads weekly.
+4. **Add festival dates** each year in `autopilot.toml` under `[[festivals]]`. The AI is never asked to guess lunar-calendar dates.
