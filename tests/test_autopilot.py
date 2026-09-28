@@ -374,3 +374,19 @@ def test_outages_do_not_use_up_content_drafts(settings, monkeypatch):
     monkeypatch.setattr(writer, "_provider", lambda name: type("P", (), {"complete_json": staticmethod(flaky)}))
     sc = writer.write_script(planner.Plan(date(2026, 9, 27), "x"), settings, [], PICS)
     assert sc.provider == "gemini:gemini-3.6-flash"  # two overloaded models skipped, then 2 drafts succeeded
+
+
+def test_locked_old_video_gets_a_new_name(tmp_path, monkeypatch):
+    old = tmp_path / "muruganAuto_2026-09-27.mp4"
+    old.write_bytes(b"old")
+    real_open = open
+
+    def locked_open(p, mode="r", *a, **k):
+        if Path(p) == old and "+" in mode:
+            raise PermissionError("in use by video player")
+        return real_open(p, mode, *a, **k)
+
+    monkeypatch.setattr("builtins.open", locked_open)
+    assert run_mod._free_output_path(old).name == "muruganAuto_2026-09-27_v2.mp4"
+    monkeypatch.setattr("builtins.open", real_open)
+    assert run_mod._free_output_path(old) == old  # not locked: replaced as usual

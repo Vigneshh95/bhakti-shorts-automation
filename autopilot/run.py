@@ -66,6 +66,26 @@ def _write_patiently(plan, settings: dict, history, pictures, interactive: bool)
     raise AssertionError("unreachable")
 
 
+def _free_output_path(path: Path) -> Path:
+    """Windows locks a video while it's open in a player (e.g. after a preview), and the new
+    video then can't replace it. If the old one is locked, write the new one next to it."""
+    if not path.exists():
+        return path
+    try:
+        with open(path, "r+b"):
+            return path  # writable: it can be replaced as usual
+    except PermissionError:
+        n = 2
+        while (alt := path.with_name(f"{path.stem}_v{n}{path.suffix}")).exists():
+            try:
+                with open(alt, "r+b"):
+                    return alt
+            except PermissionError:
+                n += 1
+        log.warning("  %s is open in another program (e.g. a video player); saving as %s", path.name, alt.name)
+        return alt
+
+
 def _write_if_changed(path: Path, text: str) -> None:
     """Rewriting an identical file would make the finished video look out of date and
     trigger a needless re-render; only write when the content actually changes."""
@@ -159,7 +179,7 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
         _write_if_changed(ep_dir / "lines.txt", "\n".join(script.lines) + "\n")
         _write_if_changed(ep_dir / "episode.toml", _episode_toml(script, settings.get("look", {})))
 
-        out = settings["paths"]["output"] / f"muruganAuto_{day.isoformat()}.mp4"
+        out = _free_output_path(settings["paths"]["output"] / f"muruganAuto_{day.isoformat()}.mp4")
         with timer.stage("video"):
             # Fingerprint of everything the video is made from; the video is reused only if it matches
             # (timestamps aren't reliable enough to decide that).
