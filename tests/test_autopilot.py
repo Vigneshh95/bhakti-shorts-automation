@@ -427,3 +427,11 @@ def test_second_run_while_one_is_working_does_nothing(settings, monkeypatch, tmp
     assert "already working" in run_mod.run(date(2026, 9, 28))["skipped"] and st["renders"] == 0
     lock.write_text(json.dumps({"pid": 999999, "started": "old"}), encoding="utf-8")  # dead process: stale lock
     assert run_mod.run(date(2026, 9, 28), upload=False)["image"] and not lock.exists()
+
+
+def test_yesterday_means_the_last_picture_used_that_day(tmp_path):
+    h = planner.History(tmp_path / "h.json")
+    h.runs = [{"date": "2026-09-27", "image_digest": "FIRST", "made_at": "2026-09-27T08:00:00"},
+              {"date": "2026-09-27", "image_digest": "LAST", "made_at": "2026-09-27T12:00:00"},
+              {"date": "2026-09-26", "image_digest": "OLDER", "made_at": "2026-09-26T23:00:00"}]
+    assert h.last_image(before=date(2026, 9, 28)) == "LAST"

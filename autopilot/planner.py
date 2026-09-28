@@ -57,7 +57,8 @@ class History:
     def last_image(self, before: date) -> str | None:
         """Digest of the most recent picture used before `before` (so it isn't repeated next day)."""
         prior = [r for r in self.runs if r.get("image_digest") and r["date"] < before.isoformat()]
-        return max(prior, key=lambda r: r["date"])["image_digest"] if prior else None
+        # the LAST record of the latest day (a day can have several runs, e.g. previews)
+        return max(prior, key=lambda r: (r["date"], r.get("made_at", "")))["image_digest"] if prior else None
 
     def uploads_on(self, day: date) -> list[dict]:
         return [r for r in self.runs if r.get("date") == day.isoformat() and r.get("video_id")]
