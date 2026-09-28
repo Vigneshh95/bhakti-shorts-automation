@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import shutil
 import time as time_module
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from autopilot import library, planner, writer, youtube
+from autopilot.bank import Bank
 from autopilot.http import ProviderError
 from autopilot.notify import ask, notify
 from autopilot.script import Script
@@ -47,23 +49,79 @@ def _describer(settings: dict):
     return describe
 
 
-def _write_patiently(plan, settings: dict, history, pictures, interactive: bool) -> Script:
-    """Unattended runs wait out temporary outages (e.g. "model overloaded") instead of losing
-    the day; a manual click fails fast so nobody sits watching a console."""
-    tries = 1 if interactive else 1 + int(settings["schedule"].get("outage_retries", 3))
+def _write_patiently(plan, settings: dict, history, pictures, interactive: bool) -> tuple[Script, bool]:
+    """Returns (script, fresh). Unattended runs wait out short outages; if every writer stays
+    down, a spare reviewed script from the bank is used instead of losing the day. A manual
+    click doesn't wait: it goes straight to the bank."""
+    tries = 1 if interactive else 1 + int(settings["schedule"].get("outage_retries", 1))
     wait = int(settings["schedule"].get("outage_wait_minutes", 10))
     for attempt in range(1, tries + 1):
         try:
-            return writer.write_script(plan, settings, history.recent_titles(20), pictures)
+            return writer.write_script(plan, settings, history.recent_titles(20), pictures), True
         except writer.NoPublishableScript:
             raise
         except RuntimeError as e:
             if attempt == tries:
-                raise
+                spare = Bank(settings["paths"]["bank"]).take()
+                if spare:
+                    log.warning("  all writers unavailable (%s); using a spare script instead", str(e).splitlines()[0][:120])
+                    return spare[0], False
+                raise RuntimeError(f"{e} -- and there's no spare script in the bank yet") from e
             log.warning("  all writers unavailable (%s); waiting %d min before retry %d/%d",
                         str(e).splitlines()[0][:120], wait, attempt, tries - 1)
             time_module.sleep(wait * 60)
     raise AssertionError("unreachable")
+
+
+def _top_up_bank(plan, settings: dict, history, pictures, day) -> None:
+    """On a day the writer works, add one spare script for a future theme (best effort)."""
+    bank = Bank(settings["paths"]["bank"])
+    if bank.size() >= int(settings["content"].get("spare_scripts", 3)):
+        return
+    avoid = {plan.theme, *bank.themes(), *history.recent_themes(settings["content"]["recent_topics_to_avoid"])}
+    themes = [t for t in settings["content"]["themes"] if t not in avoid] or settings["content"]["themes"]
+    theme = themes[(day.toordinal() * 7) % len(themes)]
+    try:
+        spare = writer.write_script(planner.Plan(day, theme), settings, history.recent_titles(20), pictures)
+    except (RuntimeError, ProviderError) as e:
+        log.info("  couldn't write a spare script today (%s); will try next time", str(e).splitlines()[0][:100])
+        return
+    bank.add(spare, theme, day)
+    log.info("  saved a spare script for bad days (theme: %s; bank: %d)", theme, bank.size())
+
+
+class AlreadyRunning(RuntimeError):
+    pass
+
+
+class RunLock:
+    """One autopilot run at a time (e.g. a double-click while the scheduled run is making the
+    2-hour talking head). A lock left behind by a crash or power cut is ignored, because its
+    process is no longer alive."""
+
+    def __init__(self, path: Path):
+        self.path = path
+
+    def __enter__(self):
+        import psutil
+
+        if self.path.exists():
+            try:
+                info = json.loads(self.path.read_text(encoding="utf-8"))
+                if psutil.pid_exists(info["pid"]) and info["pid"] != os.getpid():
+                    raise AlreadyRunning(f"another autopilot run is already working (started {info['started']})")
+            except (ValueError, KeyError):
+                pass  # unreadable lock: treat as stale
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"pid": os.getpid(), "started": datetime.now().strftime("%d %b %H:%M")}),
+                             encoding="utf-8")
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            self.path.unlink()
+        except OSError:
+            pass
 
 
 def _free_output_path(path: Path) -> Path:
@@ -113,6 +171,15 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
         interactive: bool = True) -> dict:
     settings = load_settings()
     day = day or date.today()
+    try:
+        with RunLock(settings["paths"]["episodes"] / ".running.lock"):
+            return _run(settings, day, upload, publish_now, force, interactive)
+    except AlreadyRunning as e:
+        log.info("Nothing to do: %s. It will finish on its own.", e)
+        return {"skipped": str(e)}
+
+
+def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool, interactive: bool) -> dict:
     history = planner.History(settings["paths"]["state"])
     ep_dir = settings["paths"]["episodes"] / day.isoformat()
     handler = _file_log(ep_dir / "run.log")
@@ -140,6 +207,7 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
             log.info("  %s", plan.context())
 
         script_path = ep_dir / "script.json"
+        spare_candidates = None
         folder = settings["paths"]["image_folder"]
         with timer.stage("picture + script"):
             script = None
@@ -162,7 +230,14 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
                 cands = library.candidates(pictures, history.image_usage(), history.last_image(before=day),
                                            settings["content"]["picture_choices"], seed=day.toordinal())
                 log.info("  %d pictures in the library; offering the writer %d least-used", len(pictures), len(cands))
-                script = _write_patiently(plan, settings, history, [(p.id, p.summary()) for p in cands], interactive)
+                offered = [(p.id, p.summary()) for p in cands]
+                script, fresh = _write_patiently(plan, settings, history, offered, interactive)
+                if fresh:
+                    spare_candidates = offered
+                elif script.image_id not in {p.id for p in cands}:
+                    # a spare written for a picture that's gone or was just used: take the least-used one
+                    log.info("  the spare's picture %s isn't available today; using %s", script.image_id, cands[0].id)
+                    script.image_id = cands[0].id
                 digest = next(p.digest for p in cands if p.id == script.image_id)
                 script_path.write_text(json.dumps({**script.to_dict(), "image_digest": digest}, ensure_ascii=False,
                                                   indent=1), encoding="utf-8")
@@ -215,6 +290,8 @@ def run(day: date | None = None, upload: bool = True, publish_now: bool = False,
         else:
             log.info("✅ Made %s (upload skipped)", out)
         history.add(record)
+        if spare_candidates:  # the writer worked today: keep a spare for a day when it won't
+            _top_up_bank(plan, settings, history, spare_candidates, day)
         log.info("%s", timer.summary())
         return record
     finally:

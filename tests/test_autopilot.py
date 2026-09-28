@@ -32,7 +32,7 @@ PICS = [("a.png", "Bala Murugan with peacock"), ("b.png", "Murugan on a hill at 
 def settings(tmp_path):
     s = load_settings()
     s["paths"].update(episodes=tmp_path / "ep", output=tmp_path / "out", image_folder=tmp_path / "pics",
-                      state=tmp_path / "ep" / "history.json")
+                      state=tmp_path / "ep" / "history.json", bank=tmp_path / "bank")
     return s
 
 
@@ -390,3 +390,40 @@ def test_locked_old_video_gets_a_new_name(tmp_path, monkeypatch):
     assert run_mod._free_output_path(old).name == "muruganAuto_2026-09-27_v2.mp4"
     monkeypatch.setattr("builtins.open", real_open)
     assert run_mod._free_output_path(old) == old  # not locked: replaced as usual
+
+
+def test_spare_script_is_banked_on_good_days_and_used_when_writers_are_down(settings, monkeypatch):
+    st = _fake_world(monkeypatch, settings)
+    run_mod.run(date(2026, 9, 27), upload=False)
+    from autopilot.bank import Bank
+    assert Bank(settings["paths"]["bank"]).size() == 1  # a good day tops up the bank
+
+    def down(*a, **k):
+        raise ProviderError("HTTP 503 overloaded")
+
+    monkeypatch.setattr(writer, "_provider", lambda name: type("P", (), {"complete_json": staticmethod(down)}))
+    rec = run_mod.run(date(2026, 9, 28), upload=False)  # every writer down all day
+    assert rec["title"] == GOOD["youtube_title"] and Path(rec["video"]).exists()  # the spare saved the day
+    assert Bank(settings["paths"]["bank"]).size() == 0
+
+
+def test_no_spare_and_no_writer_is_a_clear_error(settings, monkeypatch):
+    _fake_world(monkeypatch, settings)
+
+    def down(*a, **k):
+        raise ProviderError("HTTP 503 overloaded")
+
+    monkeypatch.setattr(writer, "_provider", lambda name: type("P", (), {"complete_json": staticmethod(down)}))
+    with pytest.raises(RuntimeError, match="no spare script"):
+        run_mod.run(date(2026, 9, 28), upload=False)
+
+
+def test_second_run_while_one_is_working_does_nothing(settings, monkeypatch, tmp_path):
+    import os as _os
+    st = _fake_world(monkeypatch, settings)
+    lock = settings["paths"]["episodes"] / ".running.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(json.dumps({"pid": _os.getppid(), "started": "28 Sep 19:35"}), encoding="utf-8")  # a live process
+    assert "already working" in run_mod.run(date(2026, 9, 28))["skipped"] and st["renders"] == 0
+    lock.write_text(json.dumps({"pid": 999999, "started": "old"}), encoding="utf-8")  # dead process: stale lock
+    assert run_mod.run(date(2026, 9, 28), upload=False)["image"] and not lock.exists()

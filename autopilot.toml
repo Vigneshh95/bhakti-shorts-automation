@@ -18,6 +18,7 @@ episodes = "episodes/auto"          # one folder per day: script.json, image, ru
 output = "Final/auto"               # finished videos (kept apart from Final/, so upload_short.bat can't pick them up)
 image_folder = "daily_images"       # PUT YOUR PICTURES HERE. New ones are described once (free Gemini vision) and cached
 state = "episodes/auto/history.json"
+bank = "episodes/auto/spare_scripts"      # reviewed spare scripts for days when every writer is down
 
 [content]
 channel_name = "BrahmaNadagam"
@@ -25,6 +26,7 @@ lines_min = 6
 lines_max = 8
 max_line_chars = 70                 # keeps each spoken line short and clear for the TTS voice
 recent_topics_to_avoid = 45         # don't repeat a theme used in the last N runs
+spare_scripts = 3                   # keep this many reviewed spares (written on good days, 2 extra Gemini calls)
 picture_choices = 12                # least-used pictures offered to the writer each day (never yesterday's)
 # Rotating everyday themes (used when the day isn't a festival).
 themes = [
@@ -69,5 +71,5 @@ max_uploads_per_day = 1             # protects against double runs (scheduled + 
 [schedule]
 task_name = "Murugan Autopilot Short"
 time = "10:00"                      # daily run time for the Windows scheduled task
-outage_retries = 3                  # scheduled runs only: if every writer is temporarily down...
+outage_retries = 1                  # scheduled runs only: if every writer is down, wait and retry this many times, then use a spare script
 outage_wait_minutes = 10            # ...wait this long and try again (a manual click fails fast)
