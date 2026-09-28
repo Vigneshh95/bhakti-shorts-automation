@@ -68,7 +68,7 @@ disclose_ai = true                  # sets YouTube's "altered or synthetic conte
 playlist = true                     # add to the playlist in config.ini
 max_uploads_per_day = 1             # protects against double runs (scheduled + manual click)
 
-[schedule]
+[schedule]                          # only used if you install the optional daily task (python -m autopilot schedule install)
 task_name = "Murugan Autopilot Short"
 time = "10:00"                      # daily run time for the Windows scheduled task
 outage_retries = 1                  # scheduled runs only: if every writer is down, wait and retry this many times, then use a spare script

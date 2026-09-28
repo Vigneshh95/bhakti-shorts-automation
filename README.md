@@ -188,7 +188,7 @@ Metadata fixes made in the uploader:
 
 ---
 
-# Autopilot: fully automatic Shorts (one click or daily)
+# Autopilot: fully automatic Shorts (one click)
 
 A second, separate workflow that uses **your own pictures**. You drop devotional images into
 `daily_images/`, and every day it:
@@ -209,7 +209,7 @@ It never changes the manual workflow. Its videos go to `Final/auto/`.
 | **2. Upload** (reuses the previewed video) | double-click `auto_short.bat` |
 | Go public immediately | `auto_short.bat --publish-now` |
 | Check keys, pictures and YouTube sign-in | `.venv\Scripts\python.exe -m autopilot check` |
-| Daily automatic run | `.venv\Scripts\python.exe -m autopilot schedule install` (`remove` / `status`) |
+| Optional: run automatically every day | `.venv\Scripts\python.exe -m autopilot schedule install` (off by default; `remove` / `status`) |
 
 Each day's files are in `episodes/auto/<date>/`: the script, a copy of the chosen picture, and `run.log`.
 
