@@ -63,6 +63,17 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
         log.info("  talking head: reusing the cached animation")
         return out
 
+    if t.get("method") == "kaggle":
+        from shorts.stages import kaggle_talk
+
+        try:
+            return kaggle_talk.animate(src, voice_wav, sadtalker, work, out, int(t.get("kaggle_timeout_min", 40)))
+        except kaggle_talk.KaggleUnavailable as e:
+            if t.get("kaggle_fallback", "sadtalker") != "sadtalker":
+                log.warning("  Kaggle unavailable (%s); no laptop fallback configured", e)
+                return None
+            log.warning("  Kaggle unavailable (%s); animating on this laptop instead (slower)", e)
+
     result_dir = work / "sadtalker"
     shutil.rmtree(result_dir, ignore_errors=True)
     result_dir.mkdir(parents=True)

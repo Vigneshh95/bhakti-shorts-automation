@@ -145,7 +145,14 @@ in_s = 0.4
 out_s = 0.6
 
 [talking]
-enabled = false                       # SadTalker talking face (lips, blinks, head motion). ~1 h on this CPU with the speed-ups; cached
+enabled = false                       # make the face talk (the autopilot turns this on)
+method = "kaggle"                     # "kaggle": SadTalker on your free Kaggle GPU (minutes; best quality)
+                                      # "light": our own mouth animation, seconds per Short (simpler look)
+                                      # "sadtalker": full talking face (lips, blinks, head motion), ~1 h per Short on this CPU
+kaggle_fallback = "sadtalker"         # if Kaggle is down: "sadtalker" on the laptop (~1 h) or "none" (still picture)
+kaggle_timeout_min = 40
+mouth_strength = 1.0                  # light: how wide the mouth opens (0.6 = subtler)
+blink = false                         # light: drawn blinks (off: looked unnatural on painted eyes)
 python = ".sadtalker_env/Scripts/python.exe"
 dir = "SadTalker"
 preprocess = "full"                   # animate the face and paste it back into the whole picture

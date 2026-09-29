@@ -127,7 +127,7 @@ def test_talking_head_enabled_end_to_end_and_falls_back_if_it_fails(episode, tmp
     from shorts.stages import talking
     (episode / "images" / "b.png").unlink()  # the talking head works on one picture
     p = episode / "episode.toml"
-    p.write_text(p.read_text(encoding="utf-8") + "[talking]\nenabled = true\n", encoding="utf-8")
+    p.write_text(p.read_text(encoding="utf-8") + '[talking]\nenabled = true\nmethod = "sadtalker"\n', encoding="utf-8")
     monkeypatch.setattr(pipeline.tts, "FastPitchVoice", lambda *a, **k: fake_voice)
     seen = {}
 

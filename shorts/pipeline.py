@@ -17,7 +17,7 @@ from shorts.config import load_config
 from shorts.effects import enabled_effects
 from shorts.log import StageTimer, log
 from shorts.stages import audio as audio_stage
-from shorts.stages import captions, render, script, talking, tts, visuals
+from shorts.stages import captions, mouth, render, script, talking, tts, visuals
 
 
 @dataclass
@@ -82,6 +82,22 @@ class PeakMemory:
         self._thread.join()
 
 
+def _light_lipsync(picture, voice_wav, cfg: dict, cache: Cache, work: Path):
+    """Our own mouth animation (seconds, not hours); None = keep the still picture."""
+    import cv2
+
+    t = cfg["talking"]
+    src = work / "talking_source.png"
+    cv2.imwrite(str(src), cv2.cvtColor(picture, cv2.COLOR_RGB2BGR))
+    python, sadtalker = talking._resolve(t["python"]), talking._resolve(t["dir"])
+    points = mouth.find_landmarks(src, python, sadtalker, cache) if python.exists() else None
+    if points is None:
+        log.warning("  no face found for lip-sync; using the still picture")
+        return None
+    log.info("  light lip-sync: mouth follows the voice")
+    return mouth.MouthAnimator(picture, points, voice_wav, cfg["video"]["fps"], t, seed=cfg["effects"]["kenburns"].get("seed", 7))
+
+
 def make_short(episode_dir: Path, preset: str | None = None, out_date: str | None = None,
                voice_style: str | None = None, output: Path | None = None) -> RunResult:
     cfg = load_config(episode_dir, preset)
@@ -135,6 +151,8 @@ def make_short(episode_dir: Path, preset: str | None = None, out_date: str | Non
             with timer.stage("talking head"):
                 if len(images) != 1:
                     log.warning("  talking head needs exactly one picture (this episode has %d); skipped", len(images))
+                elif cfg["talking"].get("method", "sadtalker") == "light":
+                    segments[0].video = _light_lipsync(images[0], aud.voice_path, cfg, cache, work)
                 else:
                     video = talking.animate(images[0], aud.voice_path, cfg, cache, work)
                     if video:

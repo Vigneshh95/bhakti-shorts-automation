@@ -10,6 +10,7 @@ soundfile
 # Video
 opencv-python-headless==4.10.0.84     # last OpenCV wheel built for numpy 1.x (newer ones pull numpy 2)
 psutil
+kaggle                                # free GPU for the talking face ([talking] method = "kaggle")
 
 # YouTube uploader (autouploadmurugan.py)
 google-api-python-client
