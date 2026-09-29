@@ -294,6 +294,10 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
             _top_up_bank(plan, settings, history, spare_candidates, day)
         log.info("%s", timer.summary())
         return record
+    except BaseException as e:  # also Ctrl+C / closing the window: say so in the day's log
+        reason = "stopped from outside (window closed or Ctrl+C)" if isinstance(e, KeyboardInterrupt) else str(e)
+        log.error("Autopilot stopped: %s", reason.splitlines()[0][:300] if reason else type(e).__name__)
+        raise
     finally:
         log.removeHandler(handler)
         handler.close()

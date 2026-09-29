@@ -143,3 +143,18 @@ def test_talking_head_enabled_end_to_end_and_falls_back_if_it_fails(episode, tmp
 
     monkeypatch.setattr(talking, "animate", lambda *a, **k: None)  # SadTalker failed: still picture instead
     assert pipeline.make_short(episode, out_date="2026-01-06").output.exists()
+
+
+def test_silent_frames_marks_pauses_but_not_gaps_inside_words(tmp_path):
+    import soundfile as sf
+    from shorts.stages.talking import silent_frames
+    sr, fps = 16000, 25
+    frame = sr // fps
+    tone = lambda n: 0.5 * np.sin(np.arange(n * frame) * 0.2)  # noqa: E731
+    wav = np.concatenate([tone(10), np.zeros(2 * frame), tone(10), np.zeros(20 * frame), tone(10)]).astype(np.float32)
+    p = tmp_path / "v.wav"
+    sf.write(p, wav, sr)
+    flags = silent_frames(p)
+    assert not any(flags[10:12])        # a 2-frame gap inside speech is not a pause
+    assert all(flags[24:40])            # a 20-frame pause is (minus 2 frames of margin each side)
+    assert not flags[22] and not flags[41]  # margin next to speech keeps the mouth free to move

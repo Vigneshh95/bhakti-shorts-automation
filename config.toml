@@ -145,15 +145,18 @@ in_s = 0.4
 out_s = 0.6
 
 [talking]
-enabled = false                       # SadTalker talking face (lips, blinks, head motion). ~2 h on this CPU; cached
+enabled = false                       # SadTalker talking face (lips, blinks, head motion). ~1 h on this CPU with the speed-ups; cached
 python = ".sadtalker_env/Scripts/python.exe"
 dir = "SadTalker"
 preprocess = "full"                   # animate the face and paste it back into the whole picture
 still = true                          # keep the pose close to the picture (less head movement)
 size = 256                            # face render size (512 is sharper but ~4x slower)
 expression_scale = 1.0
-batch_size = 2
+batch_size = 1                        # 1 lets silent pauses be skipped (2 was 4% faster per frame but can't skip them)
 pose_style = 0
+frame_step = 2                        # draw the face on every 2nd frame ("on twos"): measured 2.3x faster
+skip_silence = true                   # reuse the face during pauses between lines (~27% of frames)
+threads = 4                           # measured: 8 threads and batch 8 were both slower on this laptop
 enhancer = ""                         # "gfpgan" sharpens the face but adds a lot of CPU time
 
 # Speed-vs-quality presets: each overrides the settings above.

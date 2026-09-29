@@ -9,6 +9,7 @@ retry of the same day never repeats it. If it fails (e.g. no face found in the p
 Short is made from the still picture instead of being lost."""
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import time
@@ -21,7 +22,22 @@ from shorts.cache import Cache
 from shorts.config import ROOT
 from shorts.log import log
 
-TALKING_VERSION = "1"
+TALKING_VERSION = "2"
+VENDOR_RENDERER = Path(__file__).resolve().parent.parent / "vendor" / "sadtalker_make_animation.py"
+
+
+def install_speedups(sadtalker: Path) -> None:
+    """Puts our faster copy of SadTalker's frame loop in place (the original is kept as
+    make_animation.py.orig). With the speed settings off it behaves exactly like the original."""
+    target = sadtalker / "src/facerender/modules/make_animation.py"
+    wanted = VENDOR_RENDERER.read_bytes()
+    if target.exists() and target.read_bytes() == wanted:
+        return
+    backup = target.with_name("make_animation.py.orig")
+    if target.exists() and not backup.exists():
+        shutil.copyfile(target, backup)
+    shutil.copyfile(VENDOR_RENDERER, target)
+    log.info("  installed SadTalker speed-ups (original kept as %s)", backup.name)
 
 
 def _resolve(p: str) -> Path:
@@ -39,7 +55,8 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
 
     src = work / "talking_source.png"
     cv2.imwrite(str(src), cv2.cvtColor(picture, cv2.COLOR_RGB2BGR))
-    options = {k: t[k] for k in ("size", "still", "preprocess", "expression_scale", "enhancer", "batch_size", "pose_style")}
+    options = {k: t[k] for k in ("size", "still", "preprocess", "expression_scale", "enhancer", "batch_size", "pose_style",
+                                 "frame_step", "skip_silence") if k in t}
     key = cache.key("talking", TALKING_VERSION, src, voice_wav, options)
     out, hit = cache.lookup("talking", key, ".mp4")
     if hit:
@@ -58,11 +75,21 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
     if t["enhancer"]:
         cmd += ["--enhancer", t["enhancer"]]
 
-    log.info("  animating the face with SadTalker (slow on CPU: about 2 hours for a 40 s Short)…")
+    install_speedups(sadtalker)
+    env = {**os.environ,
+           "SADTALKER_STEP": str(t.get("frame_step", 1)),
+           "OMP_NUM_THREADS": str(t.get("threads", cfg["run"]["threads"]))}
+    if t.get("skip_silence"):
+        silent_file = work / "silent_frames.txt"
+        flags = silent_frames(voice_wav)
+        silent_file.write_text(" ".join("1" if s else "0" for s in flags))
+        env["SADTALKER_SILENT_FILE"] = str(silent_file)
+        log.info("  %d of %d frames are silent pauses (face reused there)", sum(flags), len(flags))
+    log.info("  animating the face with SadTalker (the slow step on a CPU)…")
     log_path = work / "sadtalker.log"
     t0 = time.perf_counter()
     with open(log_path, "w", encoding="utf-8", errors="replace") as lf:
-        proc = subprocess.Popen(cmd, cwd=sadtalker, stdout=lf, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(cmd, cwd=sadtalker, stdout=lf, stderr=subprocess.STDOUT, env=env)
         last = 0.0
         while proc.poll() is None:
             time.sleep(15)
@@ -77,6 +104,37 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
     shutil.copyfile(videos[-1], out)
     log.info("  talking head done in %.0f min", (time.perf_counter() - t0) / 60)
     return out
+
+
+def silent_frames(voice_wav: Path, fps: int = 25, rel_db: float = -38.0, min_run: int = 4, pad: int = 2) -> list[bool]:
+    """One flag per video frame: True where the voice is silent. Only pauses of at least
+    `min_run` frames count (not the tiny gaps inside words), and `pad` frames next to speech stay
+    'talking' so the mouth can open and close smoothly around each line."""
+    import soundfile as sf
+
+    wav, sr = sf.read(voice_wav, dtype="float32")
+    if wav.ndim > 1:
+        wav = wav.mean(axis=1)
+    hop = int(sr / fps)
+    n = len(wav) // hop
+    if n == 0:
+        return []
+    rms = np.sqrt((wav[: n * hop].reshape(n, hop) ** 2).mean(axis=1))
+    quiet = rms < rms.max() * 10 ** (rel_db / 20)
+    flags = [False] * n
+    i = 0
+    while i < n:
+        if quiet[i]:
+            j = i
+            while j < n and quiet[j]:
+                j += 1
+            if j - i >= min_run:
+                for k in range(i + (pad if i > 0 else 0), j - (pad if j < n else 0)):
+                    flags[k] = True
+            i = j
+        else:
+            i += 1
+    return flags
 
 
 class FrameSource:
