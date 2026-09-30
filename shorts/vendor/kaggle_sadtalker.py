@@ -68,8 +68,29 @@ log("internet ok")
 
 # 1) SadTalker code, from the official repository
 shutil.rmtree(WORK, ignore_errors=True)
-run(["git", "clone", "--depth", "1", "https://github.com/OpenTalker/SadTalker.git", WORK])
-log("code ready")
+if "sadtalker.zip" in INPUTS:
+    # the laptop's working copy of SadTalker (already fixed for current numpy/torch)
+    with zipfile.ZipFile(os.path.join(IN, "sadtalker.zip")) as z:
+        z.extractall("/tmp")
+else:
+    run(["git", "clone", "--depth", "1", "https://github.com/OpenTalker/SadTalker.git", WORK])
+# The upstream code still uses numpy aliases removed in numpy 1.24 (np.float, np.int, ...); the
+# laptop's copy was already patched the same way. Same meaning, current names.
+import re  # noqa: E402
+
+ALIASES = [(r"\bnp\.float(?![0-9_a-zA-Z])", "np.float64"), (r"\bnp\.int(?![0-9_a-zA-Z])", "np.int64"),
+           (r"\bnp\.bool(?![0-9_a-zA-Z])", "bool"), (r"\bnp\.complex(?![0-9_a-zA-Z])", "np.complex128"),
+           (r"\bnp\.object(?![0-9_a-zA-Z])", "object")]
+patched = 0
+for path in glob.glob(os.path.join(WORK, "**", "*.py"), recursive=True):
+    src = open(path, encoding="utf-8", errors="replace").read()
+    new = src
+    for pat, rep in ALIASES:
+        new = re.sub(pat, rep, new)
+    if new != src:
+        open(path, "w", encoding="utf-8").write(new)
+        patched += 1
+log(f"code ready ({patched} files updated for current numpy)")
 
 # 2) model files, in parallel, from the official releases
 FILES = {

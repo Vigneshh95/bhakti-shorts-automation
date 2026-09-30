@@ -70,10 +70,31 @@ def _face_crop(picture: "np.ndarray", points: "np.ndarray", max_side: int = 512)
     return crop, (x0, y0, side), scale
 
 
-def _script_with_inputs(face_jpg: bytes, voice_ogg: bytes) -> str:
+def _code_zip(sadtalker: Path) -> bytes:
+    """The laptop's working SadTalker code (no model weights; ~200 KB). The original frame loop
+    is used: the GPU doesn't need the CPU speed-ups."""
+    import io
+    import zipfile
+
+    skip = {"checkpoints", "gfpgan", "results", ".git", "docs", "examples"}
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for p in sorted(sadtalker.rglob("*")):
+            rel = p.relative_to(sadtalker)
+            if p.is_dir() or rel.parts[0] in skip or "__pycache__" in rel.parts or p.suffix in (".orig", ".ipynb"):
+                continue
+            src = p
+            if rel.as_posix() == "src/facerender/modules/make_animation.py" and p.with_name("make_animation.py.orig").exists():
+                src = p.with_name("make_animation.py.orig")
+            z.write(src, "sadtalker/" + rel.as_posix())
+    return buf.getvalue()
+
+
+def _script_with_inputs(face_jpg: bytes, voice_ogg: bytes, code_zip: bytes) -> str:
     import base64
 
-    inputs = {"face.jpg": base64.b64encode(face_jpg).decode(), "voice.ogg": base64.b64encode(voice_ogg).decode()}
+    inputs = {"face.jpg": base64.b64encode(face_jpg).decode(), "voice.ogg": base64.b64encode(voice_ogg).decode(),
+              "sadtalker.zip": base64.b64encode(code_zip).decode()}
     runner = RUNNER.read_text(encoding="utf-8")
     marker = "INPUTS = {}"
     if marker not in runner:
@@ -106,7 +127,10 @@ def animate(picture_png: Path, voice_wav: Path, points, ffmpeg: Path, work: Path
     kernel = work / "kaggle_kernel"
     shutil.rmtree(kernel, ignore_errors=True)
     kernel.mkdir(parents=True)
-    (kernel / "kaggle_sadtalker.py").write_text(_script_with_inputs(jpg.tobytes(), ogg.read_bytes()), encoding="utf-8")
+    sadtalker = ROOT / "SadTalker"
+    script = _script_with_inputs(jpg.tobytes(), ogg.read_bytes(), _code_zip(sadtalker))
+    (kernel / "kaggle_sadtalker.py").write_text(script, encoding="utf-8")
+    log.debug("Kaggle notebook size: %d KB", len(script) // 1024)
     (kernel / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{user}/{KERNEL_SLUG}", "title": KERNEL_SLUG, "code_file": "kaggle_sadtalker.py",
         "language": "python", "kernel_type": "script", "is_private": True, "enable_gpu": True,
