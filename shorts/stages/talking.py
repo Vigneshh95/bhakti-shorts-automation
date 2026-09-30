@@ -56,7 +56,7 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
     src = work / "talking_source.png"
     cv2.imwrite(str(src), cv2.cvtColor(picture, cv2.COLOR_RGB2BGR))
     options = {k: t[k] for k in ("size", "still", "preprocess", "expression_scale", "enhancer", "batch_size", "pose_style",
-                                 "frame_step", "skip_silence") if k in t}
+                                 "frame_step", "skip_silence", "method") if k in t}
     key = cache.key("talking", TALKING_VERSION, src, voice_wav, options)
     out, hit = cache.lookup("talking", key, ".mp4")
     if hit:
@@ -66,8 +66,14 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
     if t.get("method") == "kaggle":
         from shorts.stages import kaggle_talk
 
+        from shorts.stages import mouth
+
         try:
-            return kaggle_talk.animate(src, voice_wav, sadtalker, work, out, int(t.get("kaggle_timeout_min", 40)))
+            points = mouth.find_landmarks(src, python, sadtalker, cache)
+            if points is None:
+                raise kaggle_talk.KaggleUnavailable("no face found in the picture")
+            return kaggle_talk.animate(src, voice_wav, points, cfg["paths"]["ffmpeg"], work, out,
+                                       int(t.get("kaggle_timeout_min", 40)))
         except kaggle_talk.KaggleUnavailable as e:
             if t.get("kaggle_fallback", "sadtalker") != "sadtalker":
                 log.warning("  Kaggle unavailable (%s); no laptop fallback configured", e)

@@ -1,8 +1,8 @@
 """Runs ON KAGGLE (free GPU), pushed there by shorts/stages/kaggle_talk.py.
 
-Inputs (private Kaggle datasets attached to this notebook):
-  murugan-talking-input/   talking_source.png + voice_16k.wav   (today's picture and voice)
-  murugan-sadtalker-code/  SadTalker.zip                        (the SadTalker code, no weights)
+Inputs: today's picture and voice are embedded below (INPUTS, base64) by kaggle_talk.py, and
+SadTalker's code is cloned from its official GitHub repository. (Kaggle datasets aren't used:
+new-style API tokens can run notebooks but may not be allowed to manage private datasets.)
 Output (the only file left in /kaggle/working, so the download stays small):
   talking.mp4, run_log.txt
 
@@ -16,7 +16,12 @@ import subprocess
 import sys
 import time
 import urllib.request
+import base64
 import zipfile
+
+INPUTS = {}  # filled in by kaggle_talk.py: {"face.jpg": "<base64>", "voice.ogg": "<base64>"}
+# (Kaggle rejects notebooks of ~2 MB, so only a crop around the face and a compressed voice are sent;
+#  the laptop blends the animated face back into the full-resolution picture.)
 
 T0 = time.time()
 WORK = "/tmp/sadtalker"
@@ -40,21 +45,30 @@ def run(cmd, **kw):
     return res.stdout
 
 
+IN = "/tmp/in"
+os.makedirs(IN, exist_ok=True)
+for name, data in INPUTS.items():
+    with open(os.path.join(IN, name), "wb") as f:
+        f.write(base64.b64decode(data))
+
+
 def find(name):
-    hits = glob.glob(f"/kaggle/input/**/{name}", recursive=True)
-    if not hits:
-        raise SystemExit(f"{name} not found in /kaggle/input")
-    return hits[0]
+    return os.path.join(IN, name)
 
 
-# 1) SadTalker code (from the attached dataset; zip or already-extracted folder)
+# 0) Kaggle only provides internet and a GPU on phone-verified accounts; say so plainly
+import socket  # noqa: E402
+
+try:
+    socket.gethostbyname("github.com")
+except OSError:
+    raise SystemExit("NO INTERNET on Kaggle: verify your phone number at kaggle.com/settings "
+                     "(Kaggle gives internet and GPUs only to phone-verified accounts)")
+log("internet ok")
+
+# 1) SadTalker code, from the official repository
 shutil.rmtree(WORK, ignore_errors=True)
-code_zip = glob.glob("/kaggle/input/**/SadTalker.zip", recursive=True)
-if code_zip:
-    with zipfile.ZipFile(code_zip[0]) as z:
-        z.extractall("/tmp")
-else:
-    shutil.copytree(os.path.dirname(find("inference.py")), WORK)
+run(["git", "clone", "--depth", "1", "https://github.com/OpenTalker/SadTalker.git", WORK])
 log("code ready")
 
 # 2) model files, in parallel, from the official releases
@@ -97,10 +111,17 @@ for f in glob.glob("/usr/local/lib/python3*/*-packages/basicsr/data/degradations
 log("packages ready")
 run([sys.executable, "-c", "import torch; print('GPU:', torch.cuda.get_device_name(0))"])
 
+# the voice arrives compressed (Opus); SadTalker wants plain 16 kHz WAV
+ffmpeg = shutil.which("ffmpeg")
+if not ffmpeg:
+    import imageio_ffmpeg
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+run([ffmpeg, "-y", "-loglevel", "error", "-i", find("voice.ogg"), "-ac", "1", "-ar", "16000", find("voice_16k.wav")])
+
 # 4) animate
 result_dir = "/tmp/result"
 shutil.rmtree(result_dir, ignore_errors=True)
-args = [sys.executable, "inference.py", "--driven_audio", find("voice_16k.wav"), "--source_image", find("talking_source.png"),
+args = [sys.executable, "inference.py", "--driven_audio", find("voice_16k.wav"), "--source_image", find("face.jpg"),
         "--result_dir", result_dir, "--preprocess", "full", "--size", "256", "--still", "--batch_size", "8"]
 t = time.time()
 run(args, cwd=WORK)
