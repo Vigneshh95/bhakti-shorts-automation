@@ -1,0 +1,175 @@
+# Sri Mahaperiyava series: every day the essence of one Deivathin Kural chapter, retold in simple
+# Tamil in a voice modelled on your sample, over his photo (lip-sync on Kaggle), scheduled on YouTube.
+# Run: periyava_short.bat (make + upload) or periyava_preview.bat (make only). See PERIYAVA_PLAN.md.
+# Same autopilot as the Murugan series (autopilot.toml); only what's listed here differs.
+
+[series]
+name = "periyava"
+title = "Periyava Short"
+output_prefix = "periyavaAuto"
+launcher = "periyava_short.bat"
+
+[providers]
+writer = "gemini"
+fallback_writer = "openai"
+
+[models]
+gemini_text = "gemini-3.8-flash"
+gemini_text_fallback = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
+claude_text = "claude-opus-5"
+openai_text = "gpt-5.4-mini"
+
+[paths]
+episodes = "episodes/periyava"
+output = "Final/periyava"
+image_folder = "periyava_images"      # PUT MAHAPERIYAVA'S PHOTOS HERE (clear face; front-facing works best for lip-sync)
+state = "episodes/periyava/history.json"
+bank = "episodes/periyava/spare_scripts"
+source = "sources/deivathin_kural"    # collected once with: python -m autopilot source
+
+[content]
+channel_name = "BrahmaNadagam"
+source = "deivathin_kural"            # one chapter a day, never repeated, the parts in turn
+lines_min = 6
+lines_max = 9
+max_line_chars = 70
+recent_topics_to_avoid = 45
+spare_scripts = 0                     # no spares: every script must be written from that day's chapter
+picture_choices = 12
+themes = []
+title_must_contain = ["பெரியவா", "Periyava"]
+default_hashtags = ["#மகாபெரியவா", "#Mahaperiyava", "#DeivathinKural"]
+
+[prompts]
+system = """You write daily YouTube Shorts for the Tamil devotional channel "{channel}", series
+"தெய்வத்தின் குரல் — சாரம்". Each Short retells the essence of ONE chapter of Deivathin Kural (the
+discourses of Sri Chandrasekharendra Saraswathi Mahaswamigal of Kanchi, "Mahaperiyava") in about
+35-50 seconds of spoken Tamil, narrated in a gentle elderly voice over his photograph, with
+word-by-word captions.
+
+Faithfulness comes first:
+- Use ONLY ideas, examples and reasons found in today's chapter text. Add nothing of your own: no
+  new stories, promises, numbers, scripture quotes or claims. You may simplify, shorten, reorder.
+- Keep his way of teaching: warm, patient, humble, with homely examples, speaking to everyone as
+  "நாம்" / "நமக்கு", never scolding, gently leading to one practical thing to do today.
+- Make it simple enough that a young person new to these ideas understands at once: use everyday
+  Tamil for rare Sanskrit terms, or explain them in a few words.
+
+First choose the ONE picture (image_id) from the list that best fits the message. If a picture
+has text painted on it, the message must agree with that text (or choose another picture).
+
+- lines: {lmin}-{lmax} short sentences of natural spoken Tamil. Line 1 is a hook that makes the
+  viewer stay: the chapter's most striking idea in one sentence, or the question it answers. Then
+  the essence, step by step. The last line is a gentle blessing or a thought to carry through the
+  day. Tamil script ONLY (Grantha letters such as ஸ ஷ ஜ ஹ are fine): no English letters, no
+  digits (write numbers as words), no emoji, no quotation marks. Each line at most {maxc}
+  characters, ending with a full stop or a question mark. A voice model reads it aloud.
+- keywords: 1-3 key Tamil words of the message, each copied exactly as it appears in the lines
+  (without punctuation). They are shown in gold in the captions.
+- hook_title: 2-4 Tamil words shown on screen for the first seconds (today's teaching).
+- youtube_title: at most 70 characters, e.g. "மகா பெரியவா அருள்வாக்கு | The Love of a Mother". It
+  must contain "பெரியவா". Honest, no clickbait, no ALL CAPS, no hashtags.
+- youtube_description: 2-3 natural Tamil sentences about the message, then 1 English sentence,
+  naturally using searched words (Mahaperiyava, Kanchi Periyava, Deivathin Kural, தெய்வத்தின்
+  குரல், today's theme). It is a simple retelling of the essence of his teaching, so never
+  write that he speaks, says or explains something "in this video/post" (write e.g. "மகா
+  பெரியவாளின் உபதேசத்தின் சாரம்" / "the essence of Mahaperiyava's teaching on ...").
+- hashtags: 3-5, each starting with #, e.g. #மகாபெரியவா #Mahaperiyava #DeivathinKural plus one
+  theme hashtag.
+- tags: 10-20 relevant search phrases in Tamil and English about Mahaperiyava, Kanchi, Deivathin
+  Kural, Sanatana Dharma and today's theme. No numbers-only or filler tags.
+Never: medical, legal or financial advice; promises of miracles, money or cures; anything about
+caste or birth-based duties; criticism of any other faith, school or group.
+Return only JSON matching the schema."""
+
+review = """You are a careful Tamil editor and a devotee who knows Deivathin Kural well. Check the
+script and metadata below against the chapter text given with it. Return ok=false with specific
+issues if ANY of these hold: it states an idea, example, quote or claim that is not in the chapter,
+or distorts what the chapter says; incorrect or unnatural Tamil, or hard words left unexplained;
+anything disrespectful to Sri Mahaperiyava, Hinduism or any faith or group; anything about caste
+or birth-based duties; promises of miracles, cures or money; medical, legal or financial advice; a
+misleading or clickbait title, or a title/description implying these are his exact recorded
+words or that he himself speaks in this video (e.g. "பெரியவா இந்த பதிவில் விளக்குகிறார்",
+"Mahaperiyava explains in this video"); the message clearly doesn't fit the chosen picture's description. Minor stylistic
+preferences are not issues."""
+
+[look]
+loop = true
+glow_pulse = true
+talking = true                        # lips move with the voice (SadTalker on Kaggle, ~10 min)
+
+[youtube]
+publish_time = "06:30"                # IST: when people start their day
+min_lead_minutes = 30
+category_id = "22"
+language = "ta"
+disclose_ai = true                    # YouTube's "altered or synthetic content" flag (AI voice + animated photo)
+playlist = true
+playlist_id = ""                      # the "தெய்வத்தின் குரல்" playlist (created on the first upload if empty)
+playlist_title = "தெய்வத்தின் குரல் — மகா பெரியவா அருள்வாக்கு | Deivathin Kural Shorts"
+max_uploads_per_day = 1
+footer = "🙏 ஜய ஜய சங்கர ஹர ஹர சங்கர — தினமும் தெய்வத்தின் குரல் சாரம். Subscribe செய்து பகிருங்கள்."
+source_note = """இது ஸ்ரீ மகா பெரியவாளின் "தெய்வத்தின் குரல்" உபதேசத்தின் சாரத்தை எளிய தமிழில் சொல்லும் முயற்சி. குரல் AI மூலம் உருவாக்கப்பட்டது; அவருடைய சொந்த வார்த்தைகளை மேலே உள்ள நூலில் படிக்கலாம்.
+A simple AI-voiced retelling of the essence of Sri Mahaperiyava's teaching, not a recording of him. Read his own words in Deivathin Kural (link above)."""
+
+[schedule]
+task_name = "Periyava Autopilot Short"
+time = "05:00"
+outage_retries = 1
+outage_wait_minutes = 10
+
+# The video look for this series only: written into each day's episode.toml (config.toml, and
+# with it the Murugan series and the manual workflow, stay as they are).
+[video.voice]
+engine = "indicf5"                    # the voice modelled on voices/periyava_ref.wav, spoken on Kaggle
+reference = "voices/periyava_ref.wav" # 10-20 s of clear speech + its exact words in periyava_ref.txt
+reference_denoise = true
+style = "periyava"
+line_gap_ms = 1000                    # a calm, unhurried pace between thoughts
+lead_in_ms = 500
+tail_ms = 1800
+kaggle_timeout_min = 30
+
+[video.voice.styles.periyava]
+speaker = ""
+semitones = 0.0                       # his own pitch
+pace = 0.96                           # a touch slower
+formant = "preserved"
+eq_gain_db = 0.0
+warmth_db = 2.0
+compress = true
+hall = 0.8                            # soft temple-hall echo
+
+[video.paths]
+bgm = "assets/tanpura_drone.flac"     # synthesised tanpura (shorts/effects/drone.py): no music licence needed
+
+[video.audio]
+bgm_db = -22.0                        # a quiet bed under the voice, ducked further while he speaks
+
+[video.video]
+filename = "periyavaShorts_{date}.mp4"
+
+[video.captions]
+highlight_box = "#F29B38"             # saffron word highlight
+highlight_text = "#1A0E00"
+emphasis_color = "#FFE3A3"            # cream-gold key words
+
+[video.effects.grade]
+warmth = 0.08
+saturation = 1.04
+contrast = 1.04
+
+[video.effects.particles]
+count = 28                            # a few soft motes of light, not sparkles
+opacity = 0.55
+
+[video.effects.glow_pulse]
+strength = 0.16
+period_s = 5.0                        # slow, like breathing
+
+[video.effects.watermark]
+lines = ["தெய்வத்தின் குரல் சாரம் · AI குரல்", "BrahmaNadagam"]
+
+[video.effects.outro]
+text = "ஜய ஜய சங்கர ஹர ஹர சங்கர"
+duration_s = 2.0

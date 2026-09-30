@@ -39,3 +39,11 @@ ta/
 # autopilot: daily generated episodes, run history, fallback-image copies
 episodes/auto/
 daily_images/
+
+# Periyava series: daily episodes, your photos and voice sample, the collected chapter text
+# (kept local: the text belongs to its publishers), and the synthesised drone (rebuilt on demand)
+episodes/periyava/
+periyava_images/
+voices/
+sources/
+assets/tanpura_drone.flac

@@ -87,17 +87,19 @@ class Script:
     tags: list[str]
     provider: str = ""
     review_issues: list[str] = field(default_factory=list)
+    source: dict = field(default_factory=dict)  # grounded series: {"id", "credit", "url"} of the retold text
 
     def to_dict(self) -> dict:
         return {k: getattr(self, k) for k in (
             "image_id", "lines", "keywords", "hook_title", "youtube_title", "youtube_description", "hashtags",
-            "tags", "provider", "review_issues")}
+            "tags", "provider", "review_issues", "source")}
 
 
 def build_prompt(plan: Plan, settings: dict, recent_titles: list[str], pictures: list[tuple[str, str]]) -> tuple[str, str]:
     """pictures: (image_id, description) for today's candidates."""
     c = settings["content"]
-    system = SYSTEM.format(channel=c["channel_name"], lmin=c["lines_min"], lmax=c["lines_max"], maxc=c["max_line_chars"])
+    template = settings.get("prompts", {}).get("system") or SYSTEM  # a series can bring its own voice and rules
+    system = template.format(channel=c["channel_name"], lmin=c["lines_min"], lmax=c["lines_max"], maxc=c["max_line_chars"])
     user = plan.context() + "\n\nPictures to choose from:\n" + "\n".join(f"- {pid}: {desc}" for pid, desc in pictures)
     if recent_titles:
         user += "\n\nRecent titles on the channel (write something clearly different):\n- " + "\n- ".join(recent_titles[-10:])
@@ -108,7 +110,11 @@ def _words(lines: list[str]) -> set[str]:
     return {w.strip(" .,;:!?") for line in lines for w in line.split()}
 
 
-def tidy(data: dict) -> dict:
+def review_system(settings: dict) -> str:
+    return settings.get("prompts", {}).get("review") or REVIEW_SYSTEM
+
+
+def tidy(data: dict, settings: dict | None = None) -> dict:
     """Fixes purely mechanical slips in place instead of rejecting a good script over them:
     hashtag formatting/count, and punctuation stuck to key words."""
     tags, seen = [], set()
@@ -117,7 +123,8 @@ def tidy(data: dict) -> dict:
         if len(h) > 1 and h.lower() not in seen:
             seen.add(h.lower())
             tags.append(h)
-    for default in ("#முருகன்", "#Murugan", "#TamilDevotional"):
+    defaults = (settings or {}).get("content", {}).get("default_hashtags") or ["#முருகன்", "#Murugan", "#TamilDevotional"]
+    for default in defaults:
         if len(tags) >= 3:
             break
         if default.lower() not in seen:
@@ -151,8 +158,9 @@ def validate(data: dict, settings: dict, image_ids: list[str]) -> list[str]:
         errors.append(f"youtube_title must be 10-70 characters, got {len(title)}")
     if "#" in title:
         errors.append("youtube_title must not contain hashtags")
-    if "முருக" not in title and "Murugan" not in title:
-        errors.append("youtube_title must contain முருகன் or Murugan")
+    must = c.get("title_must_contain") or ["முருக", "Murugan"]
+    if not any(m in title for m in must):
+        errors.append(f"youtube_title must contain one of: {', '.join(must)}")
     tags = data.get("hashtags", [])
     if not 3 <= len(tags) <= 5 or not all(t.startswith("#") and " " not in t for t in tags):
         errors.append("hashtags: 3-5 items, each like #Word (no spaces)")

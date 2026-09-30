@@ -243,3 +243,29 @@ Unattended resilience:
 The Gemini free tier allows 20 requests a day per model. A day uses 2–6, plus one per 6 new pictures the first time they're seen.
 
 Add each year's festival dates under `[[festivals]]` in `autopilot.toml`. The AI is never asked to guess lunar-calendar dates.
+
+## Sri Mahaperiyava series (periyava.toml)
+
+Each day's Short retells the essence of one *Deivathin Kural* chapter in simple spoken Tamil. The voice is modelled on your sample, his lips move with the words, and the video is scheduled for 06:30 IST in its own playlist on the same channel. It runs on the same autopilot as Murugan; only `periyava.toml` differs, and the Murugan series is untouched. The design is in `PERIYAVA_PLAN.md`.
+
+| Action | How |
+|---|---|
+| **Preview** (make it, don't upload; opens the video) | double-click `periyava_preview.bat` |
+| **Make and upload** | double-click `periyava_short.bat` |
+| Add photos | `periyava_images/`: a clear face, front-facing, works best for lip-sync |
+| Voice sample | `voices/periyava_ref.wav` (10–20 s of clear speech, no music) + its exact words in `voices/periyava_ref.txt` |
+| Collect or refresh the chapters | `.venv\Scripts\python.exe -m autopilot source` (once; resumes if stopped) |
+| Check keys and sign-in | `.venv\Scripts\python.exe -m autopilot --series periyava check` |
+
+**How a day is made**
+1. The next unused chapter judged suitable, taking a different part each day and book order within it. Each chapter is judged once by Gemini: a practical, universal lesson → yes; caste or birth duties, detailed ritual rules, polemics or dense philosophy → no.
+2. The writer gets the whole chapter and may use only its ideas. A second pass checks the script against the chapter, the Tamil, and respect.
+3. The voice is made on Kaggle: IndicF5 speaks every line in the sample's voice, and an aligner times each word for the captions.
+4. On the laptop the voice gets a touch slower, warmer, and a soft temple-hall echo, over a synthesised tanpura drone.
+5. The talking face is made on Kaggle, as for Murugan.
+6. Upload: the description credits the chapter (with the kamakoti.org link) and says plainly that this is an AI-voiced retelling. YouTube's AI flag is set.
+
+**One-time Hugging Face setup** (IndicF5 is free but asks you to accept its terms):
+1. Sign up at huggingface.co, open huggingface.co/ai4bharat/IndicF5 and accept the terms.
+2. Settings → Access Tokens → create a **Read** token.
+3. On kaggle.com open your notebook **periyava-voice** (it appears after the first run) → Edit → Add-ons → Secrets → add `HF_TOKEN` with that token and tick it for this notebook. The token stays in Kaggle, never in these files.

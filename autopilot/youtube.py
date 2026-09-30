@@ -3,6 +3,7 @@ client + token (paths in config.ini), so no new sign-in is needed if the uploade
 from __future__ import annotations
 
 import configparser
+import json
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 
@@ -43,9 +44,15 @@ def publish_time(now: datetime, settings: dict) -> datetime:
     return slot.astimezone(timezone.utc)
 
 
-def build_description(script: Script, channel: dict) -> str:
+def build_description(script: Script, channel: dict, settings: dict | None = None) -> str:
+    yt = (settings or {}).get("youtube", {})
     parts = [script.youtube_description, "", "\n".join(script.lines), ""]
-    parts.append("🙏 தினமும் முருகன் அருள் வாக்கு — Subscribe செய்து பகிருங்கள்.")
+    if script.source:  # a retold text: credit it, and say plainly how the Short was made
+        parts += [f"ஆதாரம் (Source): {script.source['credit']}", script.source["url"]]
+        if yt.get("source_note"):
+            parts.append(yt["source_note"])
+        parts.append("")
+    parts.append(yt.get("footer") or "🙏 தினமும் முருகன் அருள் வாக்கு — Subscribe செய்து பகிருங்கள்.")
     if channel["instagram_url"]:
         parts.append(f"Instagram: {channel['instagram_url']}")
     if channel["support_url"]:
@@ -97,7 +104,7 @@ def upload(video: Path, script: Script, settings: dict, publish_at: datetime | N
     body = {
         "snippet": {
             "title": script.youtube_title,
-            "description": build_description(script, channel),
+            "description": build_description(script, channel, settings),
             "tags": script.tags,
             "categoryId": settings["youtube"]["category_id"],
             "defaultLanguage": settings["youtube"]["language"],
@@ -114,13 +121,45 @@ def upload(video: Path, script: Script, settings: dict, publish_at: datetime | N
             log.info("  uploading %d%%", int(progress.progress() * 100))
     video_id = response["id"]
 
-    if settings["youtube"]["playlist"] and channel["playlist_id"]:
+    playlist = _series_playlist(yt, settings) or channel["playlist_id"]  # a series can have its own
+    if settings["youtube"]["playlist"] and playlist:
         try:
             yt.playlistItems().insert(part="snippet", body={"snippet": {
-                "playlistId": channel["playlist_id"], "resourceId": {"kind": "youtube#video", "videoId": video_id}}}).execute()
+                "playlistId": playlist, "resourceId": {"kind": "youtube#video", "videoId": video_id}}}).execute()
         except Exception as e:  # noqa: BLE001 -- the upload itself succeeded; don't fail the run over the playlist
             log.warning("  couldn't add to playlist: %s", e)
     return video_id
+
+
+def _series_playlist(yt, settings: dict) -> str:
+    """The series' own playlist: [youtube] playlist_id, else the one named playlist_title on the
+    channel, created (public) the first time. Remembered next to the series' history."""
+    y = settings["youtube"]
+    if y.get("playlist_id") or not y.get("playlist_title"):
+        return y.get("playlist_id", "")
+    memo = settings["paths"]["state"].with_name("playlist.json")
+    if memo.exists():
+        return json.loads(memo.read_text(encoding="utf-8"))["id"]
+    try:
+        found, page = "", None
+        while not found:
+            res = yt.playlists().list(part="snippet", mine=True, maxResults=50, pageToken=page).execute()
+            found = next((p["id"] for p in res.get("items", []) if p["snippet"]["title"] == y["playlist_title"]), "")
+            page = res.get("nextPageToken")
+            if not page:
+                break
+        if not found:
+            found = yt.playlists().insert(part="snippet,status", body={
+                "snippet": {"title": y["playlist_title"], "defaultLanguage": y["language"],
+                            "description": y.get("footer", "")},
+                "status": {"privacyStatus": "public"}}).execute()["id"]
+            log.info("  created the playlist '%s'", y["playlist_title"])
+        memo.parent.mkdir(parents=True, exist_ok=True)
+        memo.write_text(json.dumps({"id": found, "title": y["playlist_title"]}, ensure_ascii=False), encoding="utf-8")
+        return found
+    except Exception as e:  # noqa: BLE001 -- never fail an upload over the playlist
+        log.warning("  couldn't find or create the playlist: %s", e)
+        return ""
 
 
 def preflight(interactive: bool) -> bool:

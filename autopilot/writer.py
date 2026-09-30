@@ -66,13 +66,16 @@ def _write_with(name: str, plan: Plan, settings: dict, recent_titles: list[str],
     while drafts < MAX_DRAFTS:
         log.info("  writing script with %s (%s), draft %d", name, model, drafts + 1)
         try:
-            data = S.tidy(provider.complete_json(model, system, user + feedback, out_schema))
+            data = S.tidy(provider.complete_json(model, system, user + feedback, out_schema), settings)
             problems = S.validate(data, settings, ids)
             if not problems:
                 chosen = dict(pictures).get(data["image_id"], "")
+                source = (f"\n\nThe source text it must be faithful to ({plan.source['credit']}):\n{plan.source['text']}"
+                          if plan.source else "")
                 review = provider.complete_json(
-                    model, S.REVIEW_SYSTEM,
-                    json.dumps(data, ensure_ascii=False, indent=1) + f"\n\nChosen picture: {chosen}", S.REVIEW_SCHEMA)
+                    model, S.review_system(settings),
+                    json.dumps(data, ensure_ascii=False, indent=1) + f"\n\nChosen picture: {chosen}" + source,
+                    S.REVIEW_SCHEMA)
         except (ProviderError, json.JSONDecodeError) as e:
             log.warning("  %s failed: %s", model, str(e).splitlines()[0][:200])
             if model == models[-1]:
@@ -90,6 +93,8 @@ def _write_with(name: str, plan: Plan, settings: dict, recent_titles: list[str],
         if review.get("ok"):
             result = S.to_script(data, f"{name}:{model}")
             result.review_issues = review.get("issues", [])
+            if plan.source:
+                result.source = {k: plan.source[k] for k in ("id", "credit", "url")}
             return result
         issues = review.get("issues") or ["reviewer rejected the script"]
         log.warning("  review rejected the draft: %s", "; ".join(issues))

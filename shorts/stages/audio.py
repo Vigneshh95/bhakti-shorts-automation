@@ -74,8 +74,13 @@ def voice_filter(style: dict, sample_rate: int) -> str:
     parts.append("highpass=f=70")
     if style.get("eq_gain_db"):
         parts.append(f"equalizer=f=4000:t=q:w=0.7:g={style['eq_gain_db']}")
+    if style.get("warmth_db"):  # a little more body in the low-mids: an old, gentle voice
+        parts.append(f"equalizer=f=220:t=q:w=1.0:g={style['warmth_db']}")
     if style.get("compress"):
         parts.append("acompressor=threshold=-18dB:ratio=3:attack=5:release=200:makeup=4")
+    if style.get("hall"):  # soft temple-hall echo: two faint early reflections, speech stays clear
+        amount = float(style["hall"])
+        parts.append(f"aecho=0.9:0.9:45|95:{0.30 * amount:.3f}|{0.18 * amount:.3f}")
     return ",".join(parts)
 
 

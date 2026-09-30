@@ -8,6 +8,7 @@ import logging
 import os
 import shutil
 import time as time_module
+import tomllib
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -27,6 +28,12 @@ def _file_log(path: Path) -> logging.Handler:
     h.setFormatter(logging.Formatter("%(asctime)s %(levelname)-7s %(message)s", "%H:%M:%S"))
     log.addHandler(h)
     return h
+
+
+def _judger(settings: dict):
+    """(system, user, schema) -> dict on Gemini's free tier, for judging source chapters."""
+    describe = _describer(settings)
+    return lambda system, user, schema: describe(system, user, schema, None)
 
 
 def _describer(settings: dict):
@@ -151,9 +158,27 @@ def _write_if_changed(path: Path, text: str) -> None:
         path.write_text(text, encoding="utf-8")
 
 
-def _episode_toml(script: Script, look: dict) -> str:
+def _toml(data: dict, prefix: str = "") -> str:
+    """Minimal TOML writer for plain nested tables (str / number / bool / list values)."""
+    scalars = {k: v for k, v in data.items() if not isinstance(v, dict)}
+    out = f"[{prefix}]\n" if prefix and scalars else ""
+    out += "".join(f"{k} = {json.dumps(v, ensure_ascii=False)}\n" for k, v in scalars.items())
+    for k, v in data.items():
+        if isinstance(v, dict):
+            out += ("\n" if out else "") + _toml(v, f"{prefix}.{k}" if prefix else k)
+    return out
+
+
+def _episode_toml(script: Script, look: dict, video: dict | None = None) -> str:
     """Turns on the autopilot's look for this episode only (config.toml defaults stay off, so
-    the manual workflow is unchanged)."""
+    the manual workflow is unchanged). `video`: the series' own look ([video] in its settings),
+    written into the episode as overrides; "{source}" in its texts becomes the retold chapter."""
+    if video:
+        from shorts.config import deep_merge
+
+        credit = json.dumps(script.source.get("credit", ""), ensure_ascii=False)[1:-1]
+        video = json.loads(json.dumps(video, ensure_ascii=False).replace("{source}", credit))
+        return _toml(deep_merge(video, tomllib.loads(_episode_toml(script, look))))
     keywords = ", ".join(json.dumps(k, ensure_ascii=False) for k in script.keywords)
     loop = look.get("loop", True)
     return (f"[episode]\ntitle = {json.dumps(script.hook_title, ensure_ascii=False)}\n\n"
@@ -168,8 +193,8 @@ def _episode_toml(script: Script, look: dict) -> str:
 
 
 def run(day: date | None = None, upload: bool = True, publish_now: bool = False, force: bool = False,
-        interactive: bool = True) -> dict:
-    settings = load_settings()
+        interactive: bool = True, series: str = "murugan") -> dict:
+    settings = load_settings(series=series)
     day = day or date.today()
     try:
         with RunLock(settings["paths"]["episodes"] / ".running.lock"):
@@ -197,14 +222,15 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
                 signed_in = youtube.preflight(interactive)
                 if not signed_in:
                     log.warning("  YouTube sign-in has expired: making the video now; it will upload after you approve.")
-                    msg = ("YouTube needs your approval to upload today's Murugan Short.\n\n"
+                    name, bat = settings["series"]["title"], settings["series"]["launcher"]
+                    msg = (f"YouTube needs your approval to upload today's {name}.\n\n"
                            "Approve now? (Yes opens the Google page in your browser; the video uploads right after.)")
-                    notify("Murugan Short: approve YouTube", "Click Yes on the popup, or double-click auto_short.bat.")
-                    ask("Murugan Short: approve YouTube", msg, yes_command=str(ROOT / "auto_short.bat"), workdir=str(ROOT))
+                    notify(f"{name}: approve YouTube", f"Click Yes on the popup, or double-click {bat}.")
+                    ask(f"{name}: approve YouTube", msg, yes_command=str(ROOT / bat), workdir=str(ROOT))
 
         with timer.stage("plan"):
-            plan = planner.plan_day(day, settings, history)
-            log.info("  %s", plan.context())
+            plan = planner.plan_day(day, settings, history, judge=_judger(settings))
+            log.info("  %s", f"{plan.source['credit']} ({plan.theme})" if plan.source else plan.context())
 
         script_path = ep_dir / "script.json"
         spare_candidates = None
@@ -252,9 +278,10 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
                 log.info("    %s", line)
 
         _write_if_changed(ep_dir / "lines.txt", "\n".join(script.lines) + "\n")
-        _write_if_changed(ep_dir / "episode.toml", _episode_toml(script, settings.get("look", {})))
+        _write_if_changed(ep_dir / "episode.toml", _episode_toml(script, settings.get("look", {}), settings.get("video")))
 
-        out = _free_output_path(settings["paths"]["output"] / f"muruganAuto_{day.isoformat()}.mp4")
+        prefix = settings["series"]["output_prefix"]
+        out = _free_output_path(settings["paths"]["output"] / f"{prefix}_{day.isoformat()}.mp4")
         with timer.stage("video"):
             # Fingerprint of everything the video is made from; the video is reused only if it matches
             # (timestamps aren't reliable enough to decide that).
@@ -268,6 +295,11 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
             else:
                 from shorts.pipeline import make_short
 
+                bgm = settings.get("video", {}).get("paths", {}).get("bgm", "")
+                if bgm.endswith("tanpura_drone.flac") and not (ROOT / bgm).exists():
+                    from shorts.effects.drone import tanpura
+
+                    tanpura(ROOT / bgm)  # synthesised once (~20 s), then reused
                 out.parent.mkdir(parents=True, exist_ok=True)  # the engine only creates its own default folder
                 make_short(ep_dir, out_date=day.isoformat(), output=out)
                 stamp.write_text(fingerprint)
@@ -275,6 +307,8 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
         record = {"date": day.isoformat(), "theme": plan.theme, "title": script.youtube_title,
                   "writer": script.provider, "image": script.image_id, "image_digest": digest, "video": str(out),
                   "made_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        if script.source:
+            record["source_id"] = script.source["id"]  # this chapter isn't retold again
         if upload and signed_in:
             with timer.stage("upload"):
                 when = None if publish_now else youtube.publish_time(datetime.now(timezone.utc), settings)
@@ -283,10 +317,11 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
                 local = when.astimezone(youtube.IST).strftime("%d %b %H:%M IST") if when else "now"
                 log.info("✅ Uploaded https://youtu.be/%s -- goes public %s", video_id, local)
                 if not interactive:
-                    notify("Murugan Short scheduled", f"{script.youtube_title} -- public {local}")
+                    notify(f"{settings['series']['title']} scheduled", f"{script.youtube_title} -- public {local}")
         elif upload:
             record["pending_upload"] = True
-            log.info("⏸ Video ready: %s. Double-click auto_short.bat to approve YouTube and upload it.", out)
+            log.info("⏸ Video ready: %s. Double-click %s to approve YouTube and upload it.", out,
+                     settings["series"]["launcher"])
         else:
             log.info("✅ Made %s (upload skipped)", out)
         history.add(record)

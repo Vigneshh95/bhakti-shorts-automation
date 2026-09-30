@@ -129,9 +129,14 @@ def make_short(episode_dir: Path, preset: str | None = None, out_date: str | Non
 
         with timer.stage("tts"):
             style = cfg["voice"]["styles"][cfg["voice"]["style"]]
-            voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))
-            lines = tts.synthesize_lines(ep.lines, style["speaker"], voice, cache)
-            del voice  # release ~1.2 GB of model weights before rendering
+            if cfg["voice"].get("engine", "fastpitch") == "indicf5":  # a cloned voice, spoken on Kaggle
+                from shorts.stages import tts_indicf5
+
+                lines = tts_indicf5.synthesize_lines(ep.lines, cfg, cache, work)
+            else:
+                voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))
+                lines = tts.synthesize_lines(ep.lines, style["speaker"], voice, cache)
+                del voice  # release ~1.2 GB of model weights before rendering
 
         with timer.stage("audio"):
             aud = audio_stage.make_audio(lines, cfg, work)

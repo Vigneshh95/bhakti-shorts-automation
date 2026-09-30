@@ -11,6 +11,7 @@ If Kaggle isn't set up, fails, or takes too long, the caller falls back to the l
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -236,8 +237,51 @@ def _fetch_output(ref: str, work: Path) -> Path:
     return dest
 
 
+def run_kernel(slug: str, script: str, work: Path, timeout_min: int, doing: str = "working") -> Path:
+    """Pushes `script` as the private GPU notebook <you>/<slug>, waits for it, and returns the
+    folder its /kaggle/working output was downloaded to. Raises KaggleUnavailable on failure,
+    with the notebook's own error message."""
+    if not KAGGLE.exists():
+        raise KaggleUnavailable("the kaggle tool isn't installed (pip install kaggle)")
+    user = username()
+    kernel = work / f"kaggle_{slug}"
+    shutil.rmtree(kernel, ignore_errors=True)
+    kernel.mkdir(parents=True)
+    (kernel / "script.py").write_text(script, encoding="utf-8")
+    (kernel / "kernel-metadata.json").write_text(json.dumps({
+        "id": f"{user}/{slug}", "title": slug, "code_file": "script.py", "language": "python",
+        "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_internet": True,
+        "dataset_sources": [], "competition_sources": [], "kernel_sources": []}), encoding="utf-8")
+    t0 = time.time()
+    _kaggle("kernels", "push", "-p", ".", cwd=kernel, timeout=900)
+    ref, failures, last_note = f"{user}/{slug}", [], time.time()
+    time.sleep(30)
+    while True:
+        state = status(ref, failures)
+        if "complete" in state:
+            return _fetch_output(ref, work / f"kaggle_{slug}_out")
+        if "error" in state or "cancel" in state:
+            raise KaggleUnavailable(f"the Kaggle run failed: {_tail(_fetch_output(ref, work / f'kaggle_{slug}_out'))}")
+        if time.time() - t0 > timeout_min * 60:
+            raise KaggleUnavailable(f"the Kaggle run took longer than {timeout_min} minutes")
+        if time.time() - last_note > 180:
+            last_note = time.time()
+            log.info("  …Kaggle GPU %s (%d min so far)", doing, (time.time() - t0) // 60)
+        time.sleep(20)
+
+
 def _tail(folder: Path) -> str:
-    """Last meaningful line from the run's own log, or from Kaggle's notebook log."""
+    """The notebook's own error (SystemExit / exception line) if it has one, else the last
+    line of the run's own log, else of Kaggle's notebook log."""
+    for kl in folder.glob("*.log"):
+        try:
+            events = json.loads(kl.read_text(encoding="utf-8", errors="replace"))
+            text = "".join(e.get("data", "") for e in events if e.get("stream_name") == "stderr")
+            errors = [l for l in text.splitlines() if re.match(r"^(SystemExit|\w+(Error|Exception))\b", l.strip())]
+            if errors:
+                return errors[-1].strip()[:300]
+        except (ValueError, AttributeError):
+            continue
     ours = folder / "run_log.txt"
     if ours.exists():
         lines = [l for l in ours.read_text(encoding="utf-8", errors="replace").splitlines() if l.strip()]

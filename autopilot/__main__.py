@@ -5,6 +5,8 @@
   python -m autopilot run --publish-now    go public immediately instead of at publish_time
   python -m autopilot check                keys, models, YouTube sign-in (read-only)
   python -m autopilot pictures             paint ~20 new pictures on Kaggle into a review folder
+  python -m autopilot source               collect Deivathin Kural chapters (Periyava series), resumable
+  python -m autopilot --series periyava run   the Sri Mahaperiyava series (periyava.toml)
   python -m autopilot schedule install     daily Windows task (time from autopilot.toml)
   python -m autopilot schedule remove
 """
@@ -22,6 +24,7 @@ from shorts.log import log, setup_logging
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m autopilot", description="Automatic Murugan Shorts")
     p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--series", default="murugan", help="murugan (autopilot.toml) or periyava (periyava.toml)")
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("--no-upload", action="store_true")
@@ -32,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check")
     pc = sub.add_parser("pictures")
     pc.add_argument("--count", type=int, default=20)
+    src = sub.add_parser("source")
+    src.add_argument("--parts", default="1,2,3,4,5,6,7")
     s = sub.add_parser("schedule")
     s.add_argument("action", choices=["install", "remove", "status"])
     args = p.parse_args(argv)
@@ -42,9 +47,15 @@ def main(argv: list[str] | None = None) -> int:
             from autopilot.run import run
 
             run(args.date, upload=not args.no_upload, publish_now=args.publish_now, force=args.force,
-                interactive=not args.scheduled)
+                interactive=not args.scheduled, series=args.series)
         elif args.cmd == "check":
-            return _check()
+            return _check(args.series)
+        elif args.cmd == "source":
+            from autopilot.sources import deivathin_kural as dk
+
+            store = dk.Store(ROOT / "sources" / "deivathin_kural")
+            added = store.collect(tuple(int(x) for x in args.parts.split(",")))
+            log.info("✅ %d chapters added (%d stored)", added, len(store.chapters()))
         elif args.cmd == "pictures":
             from autopilot.pictures import paint
             from autopilot.settings import load_settings
@@ -59,11 +70,11 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _check() -> int:
+def _check(series: str = "murugan") -> int:
     from autopilot import youtube
     from autopilot.settings import api_key, load_settings
 
-    s = load_settings()
+    s = load_settings(series=series)
     ok = True
     for provider, key in (("gemini", "GEMINI_API_KEY"), ("openai", "OPENAI_API_KEY"), ("claude", "ANTHROPIC_API_KEY")):
         used = provider in (s["providers"]["writer"], s["providers"].get("fallback_writer"), "gemini")  # gemini: picture descriptions

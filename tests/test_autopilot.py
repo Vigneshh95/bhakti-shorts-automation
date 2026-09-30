@@ -183,7 +183,7 @@ def _fake_world(monkeypatch, settings, signed_in=True):
     state = {"uploads": [], "renders": 0, "notes": [], "asks": []}
     _pic(settings["paths"]["image_folder"], "a.png", "orange")
     _pic(settings["paths"]["image_folder"], "b.png", "gold")
-    monkeypatch.setattr(run_mod, "load_settings", lambda: settings)
+    monkeypatch.setattr(run_mod, "load_settings", lambda **kw: settings)
     monkeypatch.setattr(run_mod, "_describer", lambda s: lambda sys_, u, sch, images: {"images": [
         {"label": label, "description": f"picture {label}", "mood": "calm", "themes": ["devotion"],
          "visible_text": "", "suitable": True} for label, _ in images]})
