@@ -115,14 +115,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if hook["enabled"] and hook_text:
         d = hook["duration_s"]
         events.append(f"Dialogue: 2,{ts(0.05)},{ts(d)},Hook,,0,0,0,,"
-                      f"{{\\an5\\pos({W // 2},{round(H * 0.16)})\\fad(250,350)\\fscx80\\fscy80\\t(0,300,\\fscx100\\fscy100)}}"
+                      f"{{\\an5\\pos({W // 2},{round(H * hook.get('position_y', 0.16))})\\fad(250,350)\\fscx80\\fscy80\\t(0,300,\\fscx100\\fscy100)}}"
                       f"{escape(hook_text)}")
 
     outro = fx["outro"]
     if outro["enabled"] and outro["text"]:
         d = outro["duration_s"]
         events.append(f"Dialogue: 2,{ts(max(0, duration - d))},{ts(duration)},Outro,,0,0,0,,"
-                      f"{{\\an5\\pos({W // 2},{round(H * 0.16)})\\fad(300,200)}}{escape(outro['text'])}")
+                      f"{{\\an5\\pos({W // 2},{round(H * outro.get('position_y', 0.16))})\\fad(300,200)}}{escape(outro['text'])}")
 
     mark = fx["watermark"]
     if mark["enabled"] and mark["lines"]:

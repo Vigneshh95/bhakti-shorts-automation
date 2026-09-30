@@ -116,7 +116,8 @@ def review_system(settings: dict) -> str:
 
 def tidy(data: dict, settings: dict | None = None) -> dict:
     """Fixes purely mechanical slips in place instead of rejecting a good script over them:
-    hashtag formatting/count, and punctuation stuck to key words."""
+    hashtag formatting/count, punctuation stuck to key words, and a key phrase given where key
+    words are wanted (its words that appear in the lines are used instead)."""
     tags, seen = [], set()
     for h in data.get("hashtags", []):
         h = "#" + re.sub(r"[\s#.,;:!?]+", "", str(h))
@@ -131,7 +132,13 @@ def tidy(data: dict, settings: dict | None = None) -> dict:
             seen.add(default.lower())
             tags.append(default)
     data["hashtags"] = tags[:5]
-    data["keywords"] = [str(k).strip(" .,;:!?") for k in data.get("keywords", [])]
+    in_lines = _words(data.get("lines", []))
+    keywords = []
+    for k in data.get("keywords", []):
+        k = str(k).strip(" .,;:!?")
+        parts = [k] if k in in_lines or " " not in k else [w.strip(" .,;:!?") for w in k.split()]
+        keywords += [w for w in parts if w and w not in keywords and (w in in_lines or len(parts) == 1)]
+    data["keywords"] = keywords[:3]
     return data
 
 

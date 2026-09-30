@@ -173,3 +173,7 @@ lines = ["தெய்வத்தின் குரல் சாரம் · A
 [video.effects.outro]
 text = "ஜய ஜய சங்கர ஹர ஹர சங்கர"
 duration_s = 2.0
+position_y = 0.50                     # over the robe: his face fills the top of most photos
+
+[video.effects.hook]
+position_y = 0.50
