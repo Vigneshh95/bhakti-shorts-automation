@@ -205,6 +205,7 @@ It never changes the manual workflow. Its videos go to `Final/auto/`.
 | Action | How |
 |---|---|
 | Add pictures | copy .jpg/.png files into `daily_images/` (at least 700 px on the short side) |
+| Paint ~20 new pictures free (Kaggle GPU, ~2 hours, about 5 min a picture) | double-click `more_pictures.bat`, then move the ones you like from `daily_images/new_pictures/` into `daily_images/` |
 | **1. Preview** (make it, don't upload; opens the video) | double-click `preview_short.bat` |
 | **2. Upload** (reuses the previewed video) | double-click `auto_short.bat` |
 | Go public immediately | `auto_short.bat --publish-now` |
@@ -214,7 +215,11 @@ It never changes the manual workflow. Its videos go to `Final/auto/`.
 Each day's files are in `episodes/auto/<date>/`: the script, a copy of the chosen picture, and `run.log`.
 
 From a PowerShell terminal in another folder, run the files by their full path:
-`& "C:hakthishortshakti-shorts-automation\Murugan\preview_short.bat"` (a bare `auto_short.bat` only works inside the Murugan folder).
+`& "C:\bhakthishorts\bhakti-shorts-automation\Murugan\preview_short.bat"` (a bare `auto_short.bat` only works inside the Murugan folder).
+
+### New pictures (more_pictures.bat)
+
+Z-Image-Turbo (an open model; its Apache-2.0 licence allows use on a monetised channel; SDXL is the backup) paints them in your private Kaggle notebook. They match the folder's style: child Murugan, golden crown, Vel and peacock. There are 20 scenes suited to different messages, such as courage, a mother's love, festivals, knowledge, hard work and nature. Every picture shows the face clearly, facing the viewer, so the talking face works. Pictures where no face is found are dropped. Nothing goes into the daily choice until you move it into `daily_images/`. On the next run each picture is described once, and the writer matches pictures to messages from those descriptions.
 
 ## When the YouTube sign-in expires
 

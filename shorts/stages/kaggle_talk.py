@@ -11,6 +11,7 @@ If Kaggle isn't set up, fails, or takes too long, the caller falls back to the l
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -33,7 +34,8 @@ def _kaggle(*args: str, cwd: Path | None = None, timeout: int = 600) -> str:
     builds temp-file names from the folder path and breaks on anything else."""
     try:
         res = subprocess.run([str(KAGGLE), "-W", *args], capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", timeout=timeout, cwd=cwd)
+                             errors="replace", timeout=timeout, cwd=cwd,
+                             env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"})
     except (OSError, subprocess.TimeoutExpired) as e:
         raise KaggleUnavailable(f"kaggle {' '.join(args[:2])}: {e}") from e
     out = (res.stdout or "") + (res.stderr or "")
@@ -43,6 +45,21 @@ def _kaggle(*args: str, cwd: Path | None = None, timeout: int = 600) -> str:
     if failed:
         raise KaggleUnavailable(f"kaggle {' '.join(args[:2])} failed: {out.strip().splitlines()[-1] if out.strip() else res.returncode}")
     return out
+
+
+def status(ref: str, failures: list[float]) -> str:
+    """The run's status, lower-case; "" while the laptop's internet blips. Gives up only after
+    10 minutes without any answer from Kaggle."""
+    try:
+        out = _kaggle("kernels", "status", ref, timeout=120).lower()
+        failures.clear()
+        return out
+    except KaggleUnavailable as e:
+        failures.append(time.time())
+        if time.time() - failures[0] > 600:
+            raise
+        log.debug("Kaggle status check failed (will retry): %s", e)
+        return ""
 
 
 def username() -> str:
@@ -142,12 +159,13 @@ def animate(picture_png: Path, voice_wav: Path, points, ffmpeg: Path, work: Path
     ref = f"{user}/{KERNEL_SLUG}"
     end = time.time() + timeout_min * 60
     last_note = 0.0
+    failures: list[float] = []
     time.sleep(30)
     while True:
-        status = _kaggle("kernels", "status", ref).lower()
-        if "complete" in status:
+        state = status(ref, failures)
+        if "complete" in state:
             break
-        if "error" in status or "cancel" in status:
+        if "error" in state or "cancel" in state:
             dest = _fetch_output(ref, work)
             raise KaggleUnavailable(f"the Kaggle run failed: {_tail(dest)}")
         if time.time() > end:

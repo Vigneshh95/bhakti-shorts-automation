@@ -4,6 +4,7 @@
   python -m autopilot run --no-upload      everything except the upload (to preview)
   python -m autopilot run --publish-now    go public immediately instead of at publish_time
   python -m autopilot check                keys, models, YouTube sign-in (read-only)
+  python -m autopilot pictures             paint ~20 new pictures on Kaggle into a review folder
   python -m autopilot schedule install     daily Windows task (time from autopilot.toml)
   python -m autopilot schedule remove
 """
@@ -29,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--date", type=date.fromisoformat)
     r.add_argument("--scheduled", action="store_true", help="unattended: never open a browser")
     sub.add_parser("check")
+    pc = sub.add_parser("pictures")
+    pc.add_argument("--count", type=int, default=20)
     s = sub.add_parser("schedule")
     s.add_argument("action", choices=["install", "remove", "status"])
     args = p.parse_args(argv)
@@ -42,6 +45,11 @@ def main(argv: list[str] | None = None) -> int:
                 interactive=not args.scheduled)
         elif args.cmd == "check":
             return _check()
+        elif args.cmd == "pictures":
+            from autopilot.pictures import paint
+            from autopilot.settings import load_settings
+
+            paint(load_settings()["paths"]["image_folder"], args.count)
         elif args.cmd == "schedule":
             return _schedule(args.action)
     except Exception as exc:  # noqa: BLE001 -- one readable line for the console and the log
