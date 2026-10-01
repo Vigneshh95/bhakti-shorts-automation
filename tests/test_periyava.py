@@ -90,7 +90,8 @@ def test_episode_look_overlay_keeps_murugan_identical(tmp_path):
     sc.source = {"id": "1:a", "credit": "தெய்வத்தின் குரல் — \"அம்மா\"", "url": "u"}
     (tmp_path / "episode.toml").write_text(_episode_toml(sc, p["look"], p["video"]), encoding="utf-8")
     cfg = load_config(tmp_path)
-    assert cfg["voice"]["engine"] == "indicf5" and cfg["voice"]["style"] == "periyava"
+    v = cfg["voice"]  # the reference voice either way: IndicF5 directly, or FastPitch re-voiced by Seed-VC
+    assert (v["engine"] == "indicf5" or v.get("convert_to")) and v["style"] == "periyava"
     assert cfg["captions"]["emphasis"] == ["அன்பே"] and cfg["talking"]["enabled"] is True
     assert cfg["paths"]["bgm"].name == "tanpura_drone.flac"
 

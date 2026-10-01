@@ -44,16 +44,17 @@ try:
 except OSError:
     raise SystemExit("NO INTERNET on Kaggle: verify your phone number at kaggle.com/settings")
 
-try:
-    from kaggle_secrets import UserSecretsClient
-
-    token = UserSecretsClient().get_secret("HF_TOKEN")
-except Exception:  # noqa: BLE001
-    token = os.environ.get("HF_TOKEN", "")
+token = INPUTS.get("hf_token", "")
 if not token:
-    raise SystemExit("NO HF_TOKEN: add your Hugging Face token as a secret named HF_TOKEN to the Kaggle notebook "
-                     "'periyava-voice' (open it on kaggle.com > Edit > Add-ons > Secrets), after accepting the "
-                     "terms at huggingface.co/ai4bharat/IndicF5")
+    try:
+        from kaggle_secrets import UserSecretsClient
+
+        token = UserSecretsClient().get_secret("HF_TOKEN")
+    except Exception:  # noqa: BLE001
+        token = os.environ.get("HF_TOKEN", "")
+if not token:
+    raise SystemExit("NO HF_TOKEN: accept the terms at huggingface.co/ai4bharat/IndicF5, create a Read token at "
+                     "huggingface.co/settings/tokens, and add the line HF_TOKEN=<token> to the .env file")
 os.environ["HF_TOKEN"] = token
 
 os.makedirs("/tmp/in", exist_ok=True)
@@ -74,7 +75,13 @@ log("GPU:", torch.cuda.get_device_name(0))
 ref_wav = "/tmp/in/ref.wav"
 audio, sr = sf.read(REF, dtype="float32")
 sf.write(ref_wav, audio, sr)
-model = AutoModel.from_pretrained("ai4bharat/IndicF5", trust_remote_code=True, token=token)
+try:
+    model = AutoModel.from_pretrained("ai4bharat/IndicF5", trust_remote_code=True, token=token)
+except Exception as e:  # noqa: BLE001
+    if "401" in str(e) or "403" in str(e) or "gated" in str(e).lower():
+        raise SystemExit("HF TOKEN REFUSED: open huggingface.co/ai4bharat/IndicF5 while signed in and accept its "
+                         "terms, and check the token in .env is a valid Read token")
+    raise
 model = model.to("cuda")
 log("IndicF5 ready")
 

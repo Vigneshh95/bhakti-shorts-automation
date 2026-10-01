@@ -138,6 +138,12 @@ def make_short(episode_dir: Path, preset: str | None = None, out_date: str | Non
                 lines = tts.synthesize_lines(ep.lines, style["speaker"], voice, cache)
                 del voice  # release ~1.2 GB of model weights before rendering
 
+        if cfg["voice"].get("convert_to"):
+            with timer.stage("voice conversion"):  # the same words, in the reference voice's timbre
+                from shorts.stages import voice_convert
+
+                lines = voice_convert.convert(lines, cfg, cache, work)
+
         with timer.stage("audio"):
             aud = audio_stage.make_audio(lines, cfg, work)
             log.info("  %.1f s of audio, %d timed words", aud.duration, len(aud.words))

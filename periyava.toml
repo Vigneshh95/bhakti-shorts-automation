@@ -121,9 +121,17 @@ outage_wait_minutes = 10
 # The video look for this series only: written into each day's episode.toml (config.toml, and
 # with it the Murugan series and the manual workflow, stay as they are).
 [video.voice]
-engine = "indicf5"                    # the voice modelled on voices/periyava_ref.wav, spoken on Kaggle
-reference = "voices/periyava_ref.wav" # 10-20 s of clear speech + its exact words in periyava_ref.txt
-reference_denoise = true
+# Two ways to get the voice of voices/periyava_ref.wav (see voices/SOURCE.txt), both on Kaggle:
+#   engine = "fastpitch" + convert_to: the laptop's Tamil voice speaks clearly, then Seed-VC
+#       re-voices it in the reference timbre. No sign-in needed. (In use.)
+#   engine = "indicf5" (and remove convert_to): IndicF5 speaks directly in the reference voice,
+#       copying its speaking style too. Needs the Hugging Face token (README).
+engine = "fastpitch"
+convert_to = "voices/periyava_ref.wav"
+convert_steps = 30                    # more = cleaner, slower
+convert_cfg = 0.7                     # how strongly to follow the reference voice (0-1)
+reference = "voices/periyava_ref_f5.wav" # indicf5: ~11 s of clear speech + its exact words in the .txt beside it
+reference_denoise = false             # the saved clip is already cleaned
 style = "periyava"
 line_gap_ms = 1000                    # a calm, unhurried pace between thoughts
 lead_in_ms = 500
@@ -131,9 +139,9 @@ tail_ms = 1800
 kaggle_timeout_min = 30
 
 [video.voice.styles.periyava]
-speaker = ""
-semitones = 0.0                       # his own pitch
-pace = 0.96                           # a touch slower
+speaker = "male"                      # the laptop voice that speaks the words (fastpitch engine)
+semitones = 0.0                       # the reference voice sets the pitch
+pace = 0.90                           # unhurried, as he spoke
 formant = "preserved"
 eq_gain_db = 0.0
 warmth_db = 2.0

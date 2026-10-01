@@ -69,6 +69,11 @@ def _speak_on_kaggle(lines: list[str], ref: Path, ref_text: str, cfg: dict, work
                     "-af", af + "loudnorm=I=-20:TP=-2", "-ac", "1", "-ar", "24000", "-c:a", "flac", str(flac)],
                    check=True)
     inputs = {"ref.flac": base64.b64encode(flac.read_bytes()).decode(), "ref_text": ref_text, "lines": lines}
+    from autopilot.settings import api_key
+
+    token = api_key("HF_TOKEN")  # a line HF_TOKEN=... in .env; goes only into your PRIVATE Kaggle notebook.
+    if token:                    # (Without it, the notebook looks for a Kaggle secret named HF_TOKEN.)
+        inputs["hf_token"] = token
     runner = RUNNER.read_text(encoding="utf-8")
     if "INPUTS = {}" not in runner:
         raise RuntimeError("IndicF5 runner template is missing its INPUTS marker")
