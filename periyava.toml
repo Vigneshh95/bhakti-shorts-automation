@@ -152,10 +152,12 @@ compress = true
 hall = 0.35                           # a hint of temple hall (more blurs the words)
 
 [video.paths]
-bgm = "assets/tanpura_drone.flac"     # synthesised tanpura (shorts/effects/drone.py): no music licence needed
+bgm = "assets/periyava_chant.mp3"     # "Hara Hara Shankara Jaya Jaya Shankara" chant (user's choice, from
+                                      # youtube.com/watch?v=_XcHVim2C1c). It is someone's recording: YouTube may
+                                      # claim it. Licence-free alternative: "assets/tanpura_drone.flac" (synthesised)
 
 [video.audio]
-bgm_db = -22.0                        # a quiet bed under the voice, ducked further while he speaks
+bgm_db = -25.0                        # very mild under the voice, ducked further while he speaks
 
 [video.video]
 filename = "periyavaShorts_{date}.mp4"

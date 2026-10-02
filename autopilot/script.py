@@ -121,6 +121,8 @@ def tidy(data: dict, settings: dict | None = None) -> dict:
     tags, seen = [], set()
     for h in data.get("hashtags", []):
         h = "#" + re.sub(r"[\s#.,;:!?]+", "", str(h))
+        if not re.fullmatch(r"#[A-Za-z0-9_஀-௿‌‍]+", h):
+            continue  # a stray character from another script (a model glitch): drop that hashtag
         if len(h) > 1 and h.lower() not in seen:
             seen.add(h.lower())
             tags.append(h)
@@ -137,8 +139,15 @@ def tidy(data: dict, settings: dict | None = None) -> dict:
     for k in data.get("keywords", []):
         k = str(k).strip(" .,;:!?")
         parts = [k] if k in in_lines or " " not in k else [w.strip(" .,;:!?") for w in k.split()]
-        keywords += [w for w in parts if w and w not in keywords and (w in in_lines or len(parts) == 1)]
-    data["keywords"] = keywords[:3]
+        for w in parts:
+            if w and w not in in_lines and len(w) >= 3:
+                # the word's dictionary form was given; the lines have it inflected (பிள்ளையார் -> பிள்ளையாரை)
+                stem = w.rstrip("்")  # the final pulli goes when an ending is added (ர் + ஐ = ரை)
+                w = next((x for x in sorted(in_lines, key=len) if x.startswith(stem)), w)
+            if w and w not in keywords and (w in in_lines or len(parts) == 1):
+                keywords.append(w)
+    found = [w for w in keywords if w in in_lines]
+    data["keywords"] = (found or keywords)[:3]  # one that isn't in the lines is dropped if others are
     return data
 
 

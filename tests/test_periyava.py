@@ -93,7 +93,8 @@ def test_episode_look_overlay_keeps_murugan_identical(tmp_path):
     v = cfg["voice"]  # the reference voice either way: IndicF5 directly, or FastPitch re-voiced by Seed-VC
     assert (v["engine"] == "indicf5" or v.get("convert_to")) and v["style"] == "periyava"
     assert cfg["captions"]["emphasis"] == ["அன்பே"] and cfg["talking"]["enabled"] is True
-    assert cfg["paths"]["bgm"].name == "tanpura_drone.flac"
+    assert cfg["paths"]["bgm"].parent.name == "assets"  # the series' own background, not Murugan's
+    assert cfg["paths"]["bgm"].name != "murugan_baby.mp3"
 
 
 def test_toml_writer_round_trips():
