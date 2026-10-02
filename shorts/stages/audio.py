@@ -97,11 +97,13 @@ def make_audio(lines: list[LineAudio], cfg: dict, work: Path) -> AudioResult:
     vf = voice_filter(style, sr)
     if bgm and bgm.exists():
         fade = audio_cfg["bgm_fade_s"]
+        fade_in = audio_cfg.get("bgm_fade_in_s", fade)  # shorter = music is there from the first frame
         music = (f"[1:a]aresample={sr},volume={audio_cfg['bgm_db']}dB,"
-                 f"afade=t=in:d={fade},afade=t=out:st={max(0.0, duration - fade):.3f}:d={fade}[bg]")
+                 f"afade=t=in:d={fade_in},afade=t=out:st={max(0.0, duration - fade):.3f}:d={fade}[bg]")
         if audio_cfg["duck"]:
+            ratio = audio_cfg.get("duck_ratio", 6)  # how far the music drops under the voice (lower = stays audible)
             graph = (f"[0:a]{vf},asplit=2[v][key];{music};"
-                     "[bg][key]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=400:makeup=1[ducked];"
+                     f"[bg][key]sidechaincompress=threshold=0.03:ratio={ratio}:attack=20:release=400:makeup=1[ducked];"
                      "[v][ducked]amix=inputs=2:duration=first:normalize=0[out]")
         else:
             graph = f"[0:a]{vf}[v];{music};[v][bg]amix=inputs=2:duration=first:normalize=0[out]"

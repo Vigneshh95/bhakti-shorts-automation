@@ -106,7 +106,7 @@ language = "ta"
 disclose_ai = true                    # YouTube's "altered or synthetic content" flag (AI voice + animated photo)
 playlist = true
 playlist_id = ""                      # the "தெய்வத்தின் குரல்" playlist (created on the first upload if empty)
-playlist_title = "தெய்வத்தின் குரல் — மகா பெரியவா அருள்வாக்கு | Deivathin Kural Shorts"
+playlist_title = "மகா பெரியவா | Maha Periyava"
 max_uploads_per_day = 1
 footer = "🙏 ஜய ஜய சங்கர ஹர ஹர சங்கர — தினமும் தெய்வத்தின் குரல் சாரம். Subscribe செய்து பகிருங்கள்."
 source_note = """இது ஸ்ரீ மகா பெரியவாளின் "தெய்வத்தின் குரல்" உபதேசத்தின் சாரத்தை எளிய தமிழில் சொல்லும் முயற்சி. குரல் AI மூலம் உருவாக்கப்பட்டது; அவருடைய சொந்த வார்த்தைகளை மேலே உள்ள நூலில் படிக்கலாம்.
@@ -157,7 +157,9 @@ bgm = "assets/periyava_chant.mp3"     # "Hara Hara Shankara Jaya Jaya Shankara" 
                                       # claim it. Licence-free alternative: "assets/tanpura_drone.flac" (synthesised)
 
 [video.audio]
-bgm_db = -25.0                        # very mild under the voice, ducked further while he speaks
+bgm_db = -15.0                        # soft, but clearly there from the first second
+bgm_fade_in_s = 0.25                  # the chant is already there when the video opens
+duck_ratio = 2                        # dips only gently under his voice, so it never goes silent
 
 [video.video]
 filename = "periyavaShorts_{date}.mp4"
@@ -181,7 +183,7 @@ strength = 0.16
 period_s = 5.0                        # slow, like breathing
 
 [video.effects.watermark]
-lines = ["தெய்வத்தின் குரல் சாரம் · AI குரல்", "BrahmaNadagam"]
+lines = ["தெய்வத்தின் குரல் சாரம்", "BrahmaNadagam"]   # (AI voice is disclosed in the description and by YouTube's label)
 
 [video.effects.outro]
 text = "ஜய ஜய சங்கர ஹர ஹர சங்கர"

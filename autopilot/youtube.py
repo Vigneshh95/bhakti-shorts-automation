@@ -44,6 +44,17 @@ def publish_time(now: datetime, settings: dict) -> datetime:
     return slot.astimezone(timezone.utc)
 
 
+def _picture_credit(image_id: str, settings: dict | None) -> str:
+    """The credit line for today's picture, if <image_folder>/credits.json lists one."""
+    folder = (settings or {}).get("paths", {}).get("image_folder")
+    if not folder or not (folder / "credits.json").exists():
+        return ""
+    try:
+        return str(json.loads((folder / "credits.json").read_text(encoding="utf-8")).get(image_id, ""))
+    except ValueError:
+        return ""
+
+
 def build_description(script: Script, channel: dict, settings: dict | None = None) -> str:
     yt = (settings or {}).get("youtube", {})
     parts = [script.youtube_description, "", "\n".join(script.lines), ""]
@@ -52,6 +63,9 @@ def build_description(script: Script, channel: dict, settings: dict | None = Non
         if yt.get("source_note"):
             parts.append(yt["source_note"])
         parts.append("")
+    credit = _picture_credit(script.image_id, settings)
+    if credit:  # a picture whose licence asks for attribution (credits.json in the picture folder)
+        parts += [credit, ""]
     parts.append(yt.get("footer") or "🙏 தினமும் முருகன் அருள் வாக்கு — Subscribe செய்து பகிருங்கள்.")
     if channel["instagram_url"]:
         parts.append(f"Instagram: {channel['instagram_url']}")
