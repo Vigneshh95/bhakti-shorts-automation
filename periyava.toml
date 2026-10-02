@@ -121,32 +121,35 @@ outage_wait_minutes = 10
 # The video look for this series only: written into each day's episode.toml (config.toml, and
 # with it the Murugan series and the manual workflow, stay as they are).
 [video.voice]
-# Two ways to get the voice of voices/periyava_ref.wav (see voices/SOURCE.txt), both on Kaggle:
-#   engine = "fastpitch" + convert_to: the laptop's Tamil voice speaks clearly, then Seed-VC
-#       re-voices it in the reference timbre. No sign-in needed. (In use.)
-#   engine = "indicf5" (and remove convert_to): IndicF5 speaks directly in the reference voice,
-#       copying its speaking style too. Needs the Hugging Face token (README).
-engine = "fastpitch"
-convert_to = "voices/periyava_ref.wav"
-convert_steps = 30                    # more = cleaner, slower
-convert_cfg = 0.7                     # how strongly to follow the reference voice (0-1)
+# APPROVED VOICE (2026-10-02, sample v3): IndicF5 on Kaggle speaks every line in the voice AND
+# speaking style (pace, pauses, tone) of voices/periyava_ref_f5.wav, 11 s of his own recording
+# (voices/SOURCE.txt). Needs HF_TOKEN in .env. Change these only if you want a different sound.
+engine = "indicf5"
+speak_speed = 0.70                    # below 1 = slower, unhurried like the recording
+speak_takes = 3                       # each line is spoken 3 times; the clearest take is kept
+speak_steps = 48                      # refinement steps (32 = default; more = cleaner articulation)
+speak_cfg = 2.3                       # how strictly the speech follows the written words (2 = default)
+# Alternative that needs no token (same timbre, but the laptop voice's flat reading style):
+#   engine = "fastpitch"  and  convert_to = "voices/periyava_ref.wav"  (Seed-VC; pace = 0.90 below)
+convert_steps = 30
+convert_cfg = 0.7
 reference = "voices/periyava_ref_f5.wav" # indicf5: ~11 s of clear speech + its exact words in the .txt beside it
 reference_denoise = false             # the saved clip is already cleaned
 style = "periyava"
-line_gap_ms = 1000                    # a calm, unhurried pace between thoughts
+line_gap_ms = 1100                    # a calm stop between thoughts (each line also keeps its own trailing-off)
 lead_in_ms = 500
 tail_ms = 1800
 kaggle_timeout_min = 30
 
 [video.voice.styles.periyava]
-speaker = "male"                      # the laptop voice that speaks the words (fastpitch engine)
+speaker = "male"                      # only used by the fastpitch alternative
 semitones = 0.0                       # the reference voice sets the pitch
-pace = 0.90                           # unhurried, as he spoke
+pace = 1.0                            # IndicF5 already speaks at his pace (speak_speed above)
 formant = "preserved"
-eq_gain_db = 0.0
-warmth_db = 2.0
+eq_gain_db = 2.5                      # presence: consonants stay crisp
+warmth_db = 1.0
 compress = true
-hall = 0.8                            # soft temple-hall echo
+hall = 0.35                           # a hint of temple hall (more blurs the words)
 
 [video.paths]
 bgm = "assets/tanpura_drone.flac"     # synthesised tanpura (shorts/effects/drone.py): no music licence needed

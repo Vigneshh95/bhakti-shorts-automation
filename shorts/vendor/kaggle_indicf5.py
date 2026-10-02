@@ -62,7 +62,9 @@ REF = "/tmp/in/ref.flac"
 with open(REF, "wb") as f:
     f.write(base64.b64decode(INPUTS["ref.flac"]))
 
-run([sys.executable, "-m", "pip", "install", "-q", "git+https://github.com/ai4bharat/IndicF5.git", "uroman", "soundfile"])
+# transformers 4.49: newer versions build models on a "meta" device, which IndicF5's vocoder setup can't run under
+run([sys.executable, "-m", "pip", "install", "-q", "git+https://github.com/ai4bharat/IndicF5.git", "uroman", "soundfile",
+     "transformers==4.49.0"])
 log("packages ready")
 
 import numpy as np  # noqa: E402
@@ -101,22 +103,25 @@ def romanise(word):
 
 
 def word_times(wav, sr, words):
-    """(start, end) seconds of each word; None where a word can't be aligned."""
+    """((start, end) seconds of each word, None where a word can't be aligned) and a clarity score:
+    how confidently the aligner hears the written words in the audio (0-1)."""
     wave = torch.from_numpy(wav).unsqueeze(0)
     if sr != bundle.sample_rate:
         wave = torchaudio.functional.resample(wave, sr, bundle.sample_rate)
     roman = [romanise(w) for w in words]
     idx = [i for i, r in enumerate(roman) if r]
     if not idx:
-        return [None] * len(words)
+        return [None] * len(words), 0.0
     with torch.inference_mode():
         emission, _ = aligner(wave.to("cuda"))
     spans = align(emission[0], tokenizer([roman[i] for i in idx]))
     ratio = wave.shape[1] / emission.shape[1] / bundle.sample_rate
     out = [None] * len(words)
+    scores = []
     for i, s in zip(idx, spans):
         out[i] = (s[0].start * ratio, s[-1].end * ratio)
-    return out
+        scores += [float(tok.score) for tok in s]
+    return out, float(np.mean(scores)) if scores else 0.0
 
 
 def fill_gaps(times, words, total):
@@ -140,35 +145,73 @@ def fill_gaps(times, words, total):
     return times
 
 
-def trim(wav, sr, db=-40.0, pad=0.08):
-    """Cut leading/trailing silence, keeping a short natural margin."""
+def trim(wav, sr, db=-48.0, lead=0.06, tail=0.30):
+    """Cut the silence before the line, but keep the voice's natural trailing-off after the last
+    word (a generous tail, eased out), so a sentence ends the way he ends it, not chopped."""
     frame = int(sr * 0.01)
     n = len(wav) // frame
     rms = np.sqrt((wav[: n * frame].reshape(n, frame) ** 2).mean(axis=1) + 1e-12)
     loud = np.nonzero(rms > rms.max() * 10 ** (db / 20))[0]
     if not len(loud):
         return wav
-    a = max(0, loud[0] * frame - int(pad * sr))
-    b = min(len(wav), (loud[-1] + 1) * frame + int(pad * sr))
-    return wav[a:b]
+    a = max(0, loud[0] * frame - int(lead * sr))
+    b = min(len(wav), (loud[-1] + 1) * frame + int(tail * sr))
+    out = wav[a:b].copy()
+    fade = min(len(out), int(0.12 * sr))
+    out[-fade:] *= np.linspace(1.0, 0.0, fade) ** 2
+    return out
 
+
+_ref = audio if audio.ndim == 1 else audio.mean(axis=1)
+_, ref_score = word_times(_ref.astype(np.float32), sr, [w.strip(".,;:!?") for w in INPUTS["ref_text"].split()])
+log(f"reference transcript fit: {ref_score:.2f} (how well the written words match the reference recording)")
+
+SPEED = float(INPUTS.get("speed", 1.0))            # below 1 = slower, with room for his pauses
+TAKES = int(INPUTS.get("takes", 1))                # each line is spoken this many times; the clearest is kept
+STEPS = int(INPUTS.get("steps", 32))               # refinement steps (more = cleaner articulation, slower)
+CFG = float(INPUTS.get("cfg", 2.0))                # how strictly the speech follows the written words
+try:
+    # The model directly, so pace and quality can be set (IndicF5's own wrapper fixes them)
+    from f5_tts.infer.utils_infer import infer_process, preprocess_ref_audio_text
+
+    REF_AUDIO, REF_TEXT = preprocess_ref_audio_text(ref_wav, INPUTS["ref_text"])
+
+    def speak(text, seed):
+        torch.manual_seed(seed)
+        return infer_process(REF_AUDIO, REF_TEXT, text, model.ema_model, model.vocoder, mel_spec_type="vocos",
+                             speed=SPEED, nfe_step=STEPS, cfg_strength=CFG, device="cuda")[0]
+
+    speak("வணக்கம்.", 0)
+    log(f"direct synthesis: speed {SPEED}, {TAKES} take(s) a line, {STEPS} steps, cfg {CFG}")
+except Exception as e:  # noqa: BLE001 -- wrapper changed: use it as published (fixed speed)
+    log(f"direct synthesis unavailable ({str(e)[:200]}); using the model's own wrapper")
+
+    def speak(text, seed):
+        torch.manual_seed(seed)
+        return model(text, ref_audio_path=ref_wav, ref_text=INPUTS["ref_text"])
 
 folder = "/tmp/voice"
 os.makedirs(folder, exist_ok=True)
 for n, text in enumerate(INPUTS["lines"], 1):
     t = time.time()
-    wav = model(text, ref_audio_path=ref_wav, ref_text=INPUTS["ref_text"])
-    wav = np.asarray(wav)
-    if wav.dtype == np.int16:
-        wav = wav.astype(np.float32) / 32768.0
-    wav = trim(wav.astype(np.float32).squeeze(), 24000)
     words = text.split()
-    times = fill_gaps(word_times(wav, 24000, [w.strip(".,;:!?") for w in words]), words, len(wav) / 24000)
+    best = None
+    for take in range(TAKES):
+        wav = np.asarray(speak(text, 1000 * n + take))
+        if wav.dtype == np.int16:
+            wav = wav.astype(np.float32) / 32768.0
+        wav = trim(wav.astype(np.float32).squeeze(), 24000)
+        times, score = word_times(wav, 24000, [w.strip(".,;:!?") for w in words])
+        if best is None or score > best[2]:
+            best = (wav, times, score, take)
+    wav, times, score, take = best
+    times = fill_gaps(times, words, len(wav) / 24000)
     sf.write(os.path.join(folder, f"line_{n:02d}.wav"), wav, 24000, subtype="PCM_16")
     with open(os.path.join(folder, f"line_{n:02d}.json"), "w", encoding="utf-8") as f:
-        json.dump({"text": text, "sample_rate": 24000, "duration": len(wav) / 24000,
+        json.dump({"text": text, "sample_rate": 24000, "duration": len(wav) / 24000, "clarity": score,
                    "words": [[w, s, e] for w, (s, e) in zip(words, times)]}, f, ensure_ascii=False)
-    log(f"line {n}/{len(INPUTS['lines'])}: {len(wav) / 24000:.1f} s ({time.time() - t:.0f} s)")
+    log(f"line {n}/{len(INPUTS['lines'])}: {len(wav) / 24000:.1f} s, clarity {score:.2f} (take {take + 1} of {TAKES}, "
+        f"{time.time() - t:.0f} s)")
 
 with zipfile.ZipFile(os.path.join(OUT, "voice.zip"), "w", zipfile.ZIP_DEFLATED) as z:
     for name in sorted(os.listdir(folder)):

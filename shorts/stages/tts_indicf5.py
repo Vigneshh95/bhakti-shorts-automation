@@ -39,9 +39,16 @@ def reference(cfg: dict) -> tuple[Path, str]:
     return ref, text_file.read_text(encoding="utf-8").strip()
 
 
+def _options(cfg: dict) -> dict:
+    """How IndicF5 speaks: pace, how many takes per line (the clearest is kept), and quality."""
+    v = cfg["voice"]
+    return {"speed": float(v.get("speak_speed", 1.0)), "takes": int(v.get("speak_takes", 1)),
+            "steps": int(v.get("speak_steps", 32)), "cfg": float(v.get("speak_cfg", 2.0))}
+
+
 def synthesize_lines(lines: list[str], cfg: dict, cache: Cache, work: Path) -> list[LineAudio]:
     ref, ref_text = reference(cfg)
-    signature = [VERSION, file_digest(ref), ref_text]
+    signature = [VERSION, file_digest(ref), ref_text, _options(cfg)]
     keys = [cache.key("tts_f5", text, signature) for text in lines]
     paths = [cache.lookup("tts_f5", k, ".wav") for k in keys]
     todo = [i for i, (p, hit) in enumerate(paths) if not (hit and p.with_suffix(".json").exists())]
@@ -60,6 +67,30 @@ def synthesize_lines(lines: list[str], cfg: dict, cache: Cache, work: Path) -> l
     return results
 
 
+def tighten(wav_path: Path, lead_s: float = 0.12, tail_s: float = 0.40) -> None:
+    """Trims a spoken line to its words: it starts just before the first word and ends a little
+    after the last (keeping the voice's natural trailing-off, eased out). The model sometimes
+    leaves a second or two of faint hiss around the speech, which would sound like odd gaps."""
+    import numpy as np
+    import soundfile as sf
+
+    meta_path = wav_path.with_suffix(".json")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if not meta.get("words"):
+        return
+    wav, sr = sf.read(wav_path, dtype="float32")
+    start = max(0.0, meta["words"][0][1] - lead_s)
+    end = min(len(wav) / sr, meta["words"][-1][2] + tail_s)
+    seg = wav[int(start * sr): int(end * sr)].copy()
+    fade_in, fade_out = min(len(seg), int(0.02 * sr)), min(len(seg), int(0.15 * sr))
+    seg[:fade_in] *= np.linspace(0.0, 1.0, fade_in)
+    seg[-fade_out:] *= np.linspace(1.0, 0.0, fade_out) ** 2
+    sf.write(wav_path, seg, sr, subtype="PCM_16")
+    meta["words"] = [[w, max(0.0, s - start), max(0.0, e - start)] for w, s, e in meta["words"]]
+    meta["duration"] = len(seg) / sr
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+
+
 def _speak_on_kaggle(lines: list[str], ref: Path, ref_text: str, cfg: dict, work: Path, outs: list[Path]) -> None:
     flac = work / "voice_reference.flac"
     # Mono 24 kHz (IndicF5's rate), the first MAX_REF_S seconds, lightly denoised: old recordings
@@ -68,7 +99,8 @@ def _speak_on_kaggle(lines: list[str], ref: Path, ref_text: str, cfg: dict, work
     subprocess.run([str(cfg["paths"]["ffmpeg"]), "-y", "-loglevel", "error", "-i", str(ref), "-t", str(MAX_REF_S),
                     "-af", af + "loudnorm=I=-20:TP=-2", "-ac", "1", "-ar", "24000", "-c:a", "flac", str(flac)],
                    check=True)
-    inputs = {"ref.flac": base64.b64encode(flac.read_bytes()).decode(), "ref_text": ref_text, "lines": lines}
+    inputs = {"ref.flac": base64.b64encode(flac.read_bytes()).decode(), "ref_text": ref_text, "lines": lines,
+              **_options(cfg)}
     from autopilot.settings import api_key
 
     token = api_key("HF_TOKEN")  # a line HF_TOKEN=... in .env; goes only into your PRIVATE Kaggle notebook.
@@ -93,4 +125,5 @@ def _speak_on_kaggle(lines: list[str], ref: Path, ref_text: str, cfg: dict, work
         for n, out in enumerate(outs, 1):
             out.write_bytes(z.read(f"line_{n:02d}.wav"))
             out.with_suffix(".json").write_bytes(z.read(f"line_{n:02d}.json"))
+            tighten(out)
     log.info("  voice made on Kaggle: %s", kaggle_talk._tail(dest))
