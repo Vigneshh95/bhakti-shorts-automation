@@ -115,7 +115,7 @@ A simple AI-voiced retelling of the essence of Sri Mahaperiyava's teaching, not 
 
 [schedule]
 task_name = "Periyava Autopilot Short"
-time = "05:00"
+time = "10:45"                        # after the Murugan run (10:00); goes public 06:30 next morning
 outage_retries = 1
 outage_wait_minutes = 10
 

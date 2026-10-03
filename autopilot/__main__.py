@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
 
             paint(load_settings()["paths"]["image_folder"], args.count)
         elif args.cmd == "schedule":
-            return _schedule(args.action)
+            return _schedule(args.action, args.series)
     except Exception as exc:  # noqa: BLE001 -- one readable line for the console and the log
         log.error("Autopilot stopped: %s", exc)
         log.debug("details", exc_info=True)
@@ -99,12 +99,13 @@ def _check(series: str = "murugan") -> int:
     return 0 if ok else 1
 
 
-def _schedule(action: str) -> int:
+def _schedule(action: str, series: str = "murugan") -> int:
     from autopilot.settings import load_settings
 
-    sched = load_settings()["schedule"]
+    settings = load_settings(series=series)
+    sched = settings["schedule"]
     name, at = sched["task_name"], sched["time"]
-    bat = ROOT / "auto_short.bat"
+    bat = ROOT / settings["series"]["launcher"]
     if action == "install":
         # StartWhenAvailable: if the laptop was off/asleep at the set time, run at the next chance.
         ps = (f"$a = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c \"\"{bat}\" --scheduled\"' "
@@ -113,7 +114,7 @@ def _schedule(action: str) -> int:
               "$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries "
               "-AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6);"
               f"Register-ScheduledTask -TaskName '{name}' -Action $a -Trigger $t -Settings $s "
-              "-Description 'Makes and schedules the daily Murugan Short (autopilot)' -Force | Out-Null")
+              f"-Description 'Makes and schedules the daily {settings['series']['title']} (autopilot)' -Force | Out-Null")
     elif action == "remove":
         ps = f"Unregister-ScheduledTask -TaskName '{name}' -Confirm:$false"
     else:

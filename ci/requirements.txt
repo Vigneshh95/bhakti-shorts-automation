@@ -1,0 +1,17 @@
+# Cloud runner (GitHub Actions): the same packages as the laptop's .venv, at the exact versions in
+# constraints.txt (pip freeze of the working environment). Install with:
+#   pip install -r ci/requirements.txt -c ci/constraints.txt --extra-index-url https://download.pytorch.org/whl/cpu
+TTS
+torch
+torchaudio
+torchvision
+numpy
+soundfile
+librosa
+opencv-python-headless
+psutil
+kaggle
+google-api-python-client
+google-auth-oauthlib
+pytest
+filterpy            # needed by facexlib (installed separately with --no-deps: it would pull a second OpenCV)

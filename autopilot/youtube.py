@@ -25,9 +25,12 @@ def channel_config() -> dict:
     cp = configparser.ConfigParser()
     cp.read(ROOT / "config.ini", encoding="utf-8")
     resolve = lambda v: Path(v) if Path(v).is_absolute() else ROOT / v  # noqa: E731
+    import os
+
+    # config.ini names this laptop's files; another machine (the cloud runner) points to its own
     return {
-        "client_secrets": resolve(cp.get("Paths", "client_secrets")),
-        "token_file": resolve(cp.get("Paths", "token_file")),
+        "client_secrets": resolve(os.environ.get("YT_CLIENT_SECRET_FILE") or cp.get("Paths", "client_secrets")),
+        "token_file": resolve(os.environ.get("YT_TOKEN_FILE") or cp.get("Paths", "token_file")),
         "playlist_id": cp.get("YouTube", "playlist_id", fallback=""),
         "instagram_url": cp.get("Social", "instagram_url", fallback=""),
         "support_url": cp.get("Social", "support_url", fallback=""),

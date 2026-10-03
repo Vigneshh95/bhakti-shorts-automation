@@ -49,6 +49,12 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
     video (same size as the picture), or None if SadTalker isn't available or failed."""
     t = cfg["talking"]
     python, sadtalker = _resolve(t["python"]), _resolve(t["dir"])
+    if not python.exists() and t.get("method") == "kaggle":
+        # No separate SadTalker environment (e.g. the cloud runner): the face is only *found* here,
+        # which this Python can do with facexlib; the animation itself runs on Kaggle.
+        import sys
+
+        python = Path(sys.executable)
     if not python.exists() or not (sadtalker / "inference.py").exists():
         log.warning("  talking head skipped: SadTalker not found at %s", sadtalker)
         return None

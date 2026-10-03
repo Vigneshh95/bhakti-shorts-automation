@@ -1,0 +1,36 @@
+name: Tests
+
+# Runs the test suite on a clean Windows machine. Needs no keys: it proves the cloud environment
+# (Python packages, FFmpeg, face finder) matches the laptop before any Short is made there.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["shorts/**", "autopilot/**", "tests/**", "ci/**", ".github/workflows/tests.yml", "*.toml"]
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ci/constraints.txt
+      - name: Set up the machine
+        shell: pwsh
+        run: |
+          try { ./ci/setup.ps1 -NoVoice } catch { Write-Host "::error title=setup failed::$($_ | Out-String)"; exit 1 }
+      - name: Run the tests
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -m pytest -q tests 2>&1 | Tee-Object -FilePath pytest.log
+          $code = $LASTEXITCODE
+          $tail = (Get-Content pytest.log -Tail 40) -join "%0A"
+          if ($code -ne 0) { Write-Host "::error title=tests failed::$tail"; exit $code }
+          Write-Host "::notice title=tests::$((Get-Content pytest.log -Tail 1))"
