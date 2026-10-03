@@ -269,3 +269,26 @@ Each day's Short retells the essence of one *Deivathin Kural* chapter in simple 
 1. Sign up at huggingface.co, open huggingface.co/ai4bharat/IndicF5 and accept the terms.
 2. Settings → Access Tokens → create a **Read** token.
 3. On kaggle.com open your notebook **periyava-voice** (it appears after the first run) → Edit → Add-ons → Secrets → add `HF_TOKEN` with that token and tick it for this notebook. The token stays in Kaggle, never in these files.
+
+## Running every day without a click
+
+**A. On the laptop (in use).** Two Windows tasks start the runs daily: Murugan at 10:00 and Mahaperiyava at 10:45. The laptop must be on (or asleep on the charger); a missed time runs at the next chance. A run never posts twice in a day, so a manual click the same day is safe.
+
+| | |
+|---|---|
+| See both tasks | `.venv\Scripts\python.exe -m autopilot --series murugan schedule status` (and `--series periyava`) |
+| Turn one off | `... --series periyava schedule remove` |
+| Turn it on / change the time | set `[schedule] time` in `autopilot.toml` / `periyava.toml`, then `... schedule install` |
+
+If the YouTube sign-in has expired, the video is still made and a popup asks you to approve.
+
+**B. In the cloud (trial): GitHub Actions**, with the laptop off. The workflow "Make a Short" (Actions tab → Run workflow) sets up a Windows runner like the laptop (`ci/setup.ps1`), takes the private files from a second **private** repository and the keys from repository secrets, makes the Short (Kaggle does the voice and face as usual) and, if ticked, uploads it.
+
+One-time setup on GitHub:
+1. Create a private repository for the private files (pictures, voice sample, music, chapter text, history) and push them to it.
+2. In the code repository → Settings → Secrets and variables → Actions:
+   - Variable `ASSETS_REPO` = `<you>/<private repo>`
+   - Secrets: `ASSETS_TOKEN` (a fine-grained token with Contents read/write on the private repo), `GEMINI_API_KEY`, `HF_TOKEN`, `KAGGLE_ACCESS_TOKEN` (contents of `%USERPROFILE%\.kaggle\access_token`), `YT_CLIENT_SECRET_JSON` (contents of `client_secret.json`), `YT_TOKEN_JSON` (contents of `murugan_token.json`).
+3. Set the Google Cloud app to **In production**, or the YouTube token in the secret stops working after 7 days.
+
+Use A **or** B for the daily run, not both: each keeps its own history, so both would post.
