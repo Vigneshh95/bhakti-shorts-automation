@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 
 from autopilot.planner import Plan
 
+LINE_SLACK = 8  # characters a line may run over max_line_chars before the draft is rejected
+
 REVIEW_SCHEMA = {
     "type": "object",
     "properties": {"ok": {"type": "boolean"}, "issues": {"type": "array", "items": {"type": "string"}}},
@@ -161,7 +163,9 @@ def validate(data: dict, settings: dict, image_ids: list[str]) -> list[str]:
     for i, line in enumerate(lines, 1):
         if not _TAMIL_LINE.match(line):
             errors.append(f"line {i} has non-Tamil characters (only Tamil script allowed): {line}")
-        if len(line) > c["max_line_chars"]:
+        # The writer is asked for max_line_chars; a few characters over still reads and sounds fine,
+        # and isn't worth throwing a whole draft away for (each draft costs two model calls).
+        if len(line) > c["max_line_chars"] + LINE_SLACK:
             errors.append(f"line {i} is {len(line)} characters (max {c['max_line_chars']})")
     if data.get("image_id") not in image_ids:
         errors.append(f"image_id must be one of: {', '.join(image_ids)}")

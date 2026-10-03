@@ -15,7 +15,7 @@ fallback_writer = "openai"
 
 [models]
 gemini_text = "gemini-3.8-flash"
-gemini_text_fallback = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
+gemini_text_fallback = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 claude_text = "claude-opus-5"
 openai_text = "gpt-5.4-mini"
 
