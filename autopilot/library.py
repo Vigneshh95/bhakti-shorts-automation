@@ -133,10 +133,19 @@ def load(folder: Path, describe=None) -> list[Picture]:
 
 
 def candidates(pictures: list[Picture], usage: dict[str, list[str]], yesterday: str | None,
-               limit: int, seed: int) -> list[Picture]:
-    """Least-used pictures first (never-used before used), never yesterday's, a few random
-    extras for variety. usage: digest -> list of dates it was used."""
+               limit: int, seed: int, rest_days: int = 0, today: str = "") -> list[Picture]:
+    """Today's choice for the writer: a random pick among the least-used pictures, never
+    yesterday's, and none shown in the last `rest_days` days (today: ISO date). If the folder is
+    too small for that rest, the longest-rested pictures are offered instead of none.
+    usage: digest -> list of dates it was used."""
     pool = [p for p in pictures if p.digest != yesterday] or pictures
+    if rest_days and today:
+        from datetime import date, timedelta
+
+        cutoff = (date.fromisoformat(today) - timedelta(days=rest_days)).isoformat()
+        rested = [p for p in pool if max(usage.get(p.digest, [""])) <= cutoff]
+        if len(rested) >= min(3, len(pool)):  # enough choice left for the writer to match the message
+            pool = rested
     rng = random.Random(seed)
     rng.shuffle(pool)  # random order among equally-used pictures
     pool.sort(key=lambda p: (len(usage.get(p.digest, [])), max(usage.get(p.digest, [""]))))

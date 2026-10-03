@@ -36,6 +36,7 @@ max_line_chars = 70
 recent_topics_to_avoid = 45
 spare_scripts = 0                     # no spares: every script must be written from that day's chapter
 picture_choices = 12
+picture_rest_days = 10              # a picture isn't shown again for this many days after it was used
 themes = []
 title_must_contain = ["பெரியவா", "Periyava"]
 default_hashtags = ["#மகாபெரியவா", "#Mahaperiyava", "#DeivathinKural"]

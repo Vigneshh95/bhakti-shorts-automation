@@ -254,7 +254,9 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
                 if not pictures:
                     raise RuntimeError(f"No usable pictures in {folder} -- add some .jpg/.png images there.")
                 cands = library.candidates(pictures, history.image_usage(), history.last_image(before=day),
-                                           settings["content"]["picture_choices"], seed=day.toordinal())
+                                           settings["content"]["picture_choices"], seed=day.toordinal(),
+                                           rest_days=int(settings["content"].get("picture_rest_days", 0)),
+                                           today=day.isoformat())
                 log.info("  %d pictures in the library; offering the writer %d least-used", len(pictures), len(cands))
                 offered = [(p.id, p.summary()) for p in cands]
                 script, fresh = _write_patiently(plan, settings, history, offered, interactive)

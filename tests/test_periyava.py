@@ -146,3 +146,16 @@ def test_cloned_voice_goes_to_kaggle_once_then_uses_cache(tmp_path, monkeypatch)
     assert calls == [["ஒன்று இரண்டு.", "மூன்று."]] and [w.text for w in lines[0].words] == ["ஒன்று", "இரண்டு."]
     tts_indicf5.synthesize_lines(["ஒன்று இரண்டு.", "புதிது."], cfg, cache, work)
     assert calls[-1] == ["புதிது."]  # only the new line goes back to Kaggle
+
+
+def test_pictures_rest_ten_days_then_come_back(tmp_path):
+    from autopilot import library
+
+    pics = [library.Picture(tmp_path / f"p{i}.png", f"d{i}", {}) for i in range(6)]
+    usage = {"d0": ["2026-10-01"], "d1": ["2026-09-25"], "d2": ["2026-09-20"]}  # d3-d5 never used
+    ids = lambda **kw: {p.digest for p in library.candidates(pics, usage, None, 12, seed=1, **kw)}
+    assert ids(rest_days=10, today="2026-10-03") == {"d2", "d3", "d4", "d5"}   # d0, d1 used in the last 10 days
+    assert "d1" in ids(rest_days=10, today="2026-10-06")                       # rested long enough: back
+    assert ids() == {f"d{i}" for i in range(6)}                                # no rest rule: all offered
+    few = library.candidates(pics[:2], usage, None, 12, seed=1, rest_days=10, today="2026-10-03")
+    assert [p.digest for p in few] == ["d1", "d0"]   # too few pictures to rest: longest-rested first, not none

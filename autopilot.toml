@@ -28,6 +28,7 @@ max_line_chars = 70                 # keeps each spoken line short and clear for
 recent_topics_to_avoid = 45         # don't repeat a theme used in the last N runs
 spare_scripts = 3                   # keep this many reviewed spares (written on good days, 2 extra Gemini calls)
 picture_choices = 12                # least-used pictures offered to the writer each day (never yesterday's)
+picture_rest_days = 10              # a picture isn't shown again for this many days after it was used
 # Rotating everyday themes (used when the day isn't a festival).
 themes = [
   "courage and fearlessness", "discipline", "patience", "gratitude", "honouring mother and father",
