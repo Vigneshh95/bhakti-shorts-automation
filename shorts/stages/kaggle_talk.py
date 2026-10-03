@@ -69,7 +69,7 @@ def username() -> str:
         key, _, value = line.strip().lstrip("-").partition(":")
         if key.strip().lower() == "username" and value.strip() and value.strip().lower() != "none":
             return value.strip()
-    raise KaggleUnavailable("not signed in to Kaggle -- run: .venv\Scripts\kaggle.exe auth login")
+    raise KaggleUnavailable(r"not signed in to Kaggle -- run: .venv\Scripts\kaggle.exe auth login")
 
 
 def _face_crop(picture: "np.ndarray", points: "np.ndarray", max_side: int = 512):
