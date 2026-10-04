@@ -4,6 +4,7 @@
   python -m autopilot run --no-upload      everything except the upload (to preview)
   python -m autopilot run --publish-now    go public immediately instead of at publish_time
   python -m autopilot check                keys, models, YouTube sign-in (read-only)
+  python -m autopilot sync                 send new pictures + history to the cloud copy (and read its history)
   python -m autopilot pictures             paint ~20 new pictures on Kaggle into a review folder
   python -m autopilot source               collect Deivathin Kural chapters (Periyava series), resumable
   python -m autopilot --series periyava run   the Sri Mahaperiyava series (periyava.toml)
@@ -33,6 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--date", type=date.fromisoformat)
     r.add_argument("--scheduled", action="store_true", help="unattended: never open a browser")
     sub.add_parser("check")
+    sy = sub.add_parser("sync")
+    sy.add_argument("--restore", action="store_true", help="also copy every shared file into place (a fresh machine)")
     pc = sub.add_parser("pictures")
     pc.add_argument("--count", type=int, default=20)
     src = sub.add_parser("source")
@@ -47,7 +50,21 @@ def main(argv: list[str] | None = None) -> int:
             from autopilot.run import run
 
             run(args.date, upload=not args.no_upload, publish_now=args.publish_now, force=args.force,
-                interactive=not args.scheduled, series=args.series)
+                interactive=not args.scheduled, series=args.series, shared=True)
+        elif args.cmd == "sync":
+            from autopilot import sync
+
+            if not sync.available():
+                log.error("No shared copy at %s", sync.CLONE)
+                return 1
+            if args.restore:  # a fresh machine (the cloud runner): everything comes from the shared copy
+                import shutil
+
+                shutil.copytree(sync.CLONE, ROOT, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git", "README.md"))
+            ok = sync.pull() and sync.push()
+            log.info("%s", "✅ Pictures and history are the same here and in the cloud" if ok
+                     else "Couldn't reach the shared copy -- check the internet and try again")
+            return 0 if ok else 1
         elif args.cmd == "check":
             return _check(args.series)
         elif args.cmd == "source":

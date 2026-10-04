@@ -159,3 +159,13 @@ def test_pictures_rest_ten_days_then_come_back(tmp_path):
     assert ids() == {f"d{i}" for i in range(6)}                                # no rest rule: all offered
     few = library.candidates(pics[:2], usage, None, 12, seed=1, rest_days=10, today="2026-10-03")
     assert [p.digest for p in few] == ["d1", "d0"]   # too few pictures to rest: longest-rested first, not none
+
+
+def test_shared_history_merges_both_sides_once():
+    from autopilot import sync
+
+    a = [{"date": "2026-10-03", "made_at": "t1", "video_id": "x"}, {"date": "2026-10-04", "made_at": "t3"}]
+    b = [{"date": "2026-10-03", "made_at": "t1", "video_id": "x"}, {"date": "2026-10-04", "made_at": "t2", "video_id": "y"}]
+    merged = sync.merge_histories(a, b)
+    assert [r["made_at"] for r in merged] == ["t1", "t2", "t3"]   # nothing lost, nothing doubled, in order
+    assert planner.History.__new__(planner.History) is not None

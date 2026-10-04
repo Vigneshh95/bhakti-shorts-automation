@@ -193,15 +193,27 @@ def _episode_toml(script: Script, look: dict, video: dict | None = None) -> str:
 
 
 def run(day: date | None = None, upload: bool = True, publish_now: bool = False, force: bool = False,
-        interactive: bool = True, series: str = "murugan") -> dict:
+        interactive: bool = True, series: str = "murugan", shared: bool = False) -> dict:
+    """shared: keep one record with the cloud runs (autopilot/sync.py): read it before the run,
+    so a Short already posted elsewhere today isn't posted again, and write it back afterwards."""
     settings = load_settings(series=series)
     day = day or date.today()
+    if shared:
+        from autopilot import sync
+
+        if sync.pull():
+            log.info("  shared history read (laptop and cloud agree on what was posted)")
     try:
         with RunLock(settings["paths"]["episodes"] / ".running.lock"):
             return _run(settings, day, upload, publish_now, force, interactive)
     except AlreadyRunning as e:
         log.info("Nothing to do: %s. It will finish on its own.", e)
         return {"skipped": str(e)}
+    finally:
+        if shared:
+            from autopilot import sync
+
+            sync.push()
 
 
 def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool, interactive: bool) -> dict:

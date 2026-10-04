@@ -272,23 +272,25 @@ Each day's Short retells the essence of one *Deivathin Kural* chapter in simple 
 
 ## Running every day without a click
 
-**A. On the laptop (in use).** Two Windows tasks start the runs daily: Murugan at 10:00 and Mahaperiyava at 10:45. The laptop must be on (or asleep on the charger); a missed time runs at the next chance. A run never posts twice in a day, so a manual click the same day is safe.
+**In the cloud (in use): GitHub Actions**, with the laptop off. The workflow "Make a Short" starts by itself every day, makes the Short (Kaggle does the voice and face as usual) and uploads it:
+
+| Series | Starts (IST) | Goes public (IST) | Second chance if the first start failed |
+|---|---|---|---|
+| Murugan | 05:47 | 18:30 the same day | 08:17 |
+| Mahaperiyava | 18:47 | 06:30 the next morning | 21:17 |
+
+GitHub may start a scheduled run some minutes late. If a run fails, GitHub emails you; the run page shows why. It can also be started by hand: Actions tab → Make a Short → Run workflow.
+
+**One shared history.** The private repository `bhakti-shorts-assets` holds the pictures, voice sample, music, chapter text and the record of what was made and uploaded. The laptop reads and writes the same record (`autopilot/sync.py`, clone in `.cache/assets_repo`), so a double-click on a .bat and the cloud run behave the same and never post twice in a day.
 
 | | |
 |---|---|
-| See both tasks | `.venv\Scripts\python.exe -m autopilot --series murugan schedule status` (and `--series periyava`) |
-| Turn one off | `... --series periyava schedule remove` |
-| Turn it on / change the time | set `[schedule] time` in `autopilot.toml` / `periyava.toml`, then `... schedule install` |
+| After adding or removing pictures | double-click `send_pictures_to_cloud.bat` |
+| Make today's Short yourself | the .bat files as before (the cloud's later start then does nothing) |
+| Stop the cloud runs | Actions tab → Make a Short → ⋯ → Disable workflow |
 
-If the YouTube sign-in has expired, the video is still made and a popup asks you to approve.
+Settings on GitHub (code repository → Settings → Secrets and variables → Actions): variable `ASSETS_REPO`; secrets `ASSETS_TOKEN`, `GEMINI_API_KEY`, `HF_TOKEN`, `KAGGLE_ACCESS_TOKEN`, `YT_CLIENT_SECRET_JSON`, `YT_TOKEN_JSON`. If you change a key in `.env`, change the secret too.
 
-**B. In the cloud (trial): GitHub Actions**, with the laptop off. The workflow "Make a Short" (Actions tab → Run workflow) sets up a Windows runner like the laptop (`ci/setup.ps1`), takes the private files from a second **private** repository and the keys from repository secrets, makes the Short (Kaggle does the voice and face as usual) and, if ticked, uploads it.
+**The YouTube sign-in:** set the Google Cloud app to **In production** (Google Auth Platform → Audience). In *Testing* the sign-in stops working every 7 days; a cloud run then makes the video but cannot upload it, and you must sign in on the laptop and paste the new `murugan_token.json` into the `YT_TOKEN_JSON` secret.
 
-One-time setup on GitHub:
-1. Create a private repository for the private files (pictures, voice sample, music, chapter text, history) and push them to it.
-2. In the code repository → Settings → Secrets and variables → Actions:
-   - Variable `ASSETS_REPO` = `<you>/<private repo>`
-   - Secrets: `ASSETS_TOKEN` (a fine-grained token with Contents read/write on the private repo), `GEMINI_API_KEY`, `HF_TOKEN`, `KAGGLE_ACCESS_TOKEN` (contents of `%USERPROFILE%\.kaggle\access_token`), `YT_CLIENT_SECRET_JSON` (contents of `client_secret.json`), `YT_TOKEN_JSON` (contents of `murugan_token.json`).
-3. Set the Google Cloud app to **In production**, or the YouTube token in the secret stops working after 7 days.
-
-Use A **or** B for the daily run, not both: each keeps its own history, so both would post.
+**On the laptop instead (off):** `.venv\Scripts\python.exe -m autopilot --series murugan schedule install` (and `--series periyava`) creates daily Windows tasks; the laptop must be on. Don't run both the tasks and the cloud schedule.
