@@ -209,3 +209,16 @@ def test_chapter_choice_avoids_the_subject_of_recent_days(tmp_path):
     for day in range(5, 12):   # whatever the day, yesterday's subject isn't taken again
         assert planner.plan_day(date(2026, 10, day), settings, h, None).source["title"] == "அம்மா"
     assert planner._subject_stems(["விநாயகர்"]) == planner._subject_stems(["விநாயகரின்"])
+
+
+def test_blocked_title_words_are_never_chosen(tmp_path):
+    store = dk.Store(tmp_path / "dk")
+    store.folder.mkdir()
+    rows = [{"part": 1, "index": i, "title": t, "url": f"{dk.BASE}c{i}.htm", "text": "அன்பு " * 100}
+            for i, t in enumerate(["வர்ண தர்மம்", "பெண்கள் உத்தியோகம் பார்ப்பது", "அன்பு"], 1)]
+    store.path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    store.save_verdicts({f"1:c{i}.htm": {"theme": "t", "summary": "s", "suitable": True} for i in range(1, 4)})  # judge slipped
+    skip = load_settings(series="periyava")["content"]["skip_title_words"]
+    settings = {"content": {"source": "deivathin_kural", "skip_title_words": skip}, "paths": {"source": store.folder}}
+    h = planner.History(tmp_path / "h.json")
+    assert {planner.plan_day(date(2026, 10, d), settings, h, None).source["title"] for d in range(1, 9)} == {"அன்பு"}

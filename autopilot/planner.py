@@ -116,7 +116,9 @@ def _chapter_plan(day: date, settings: dict, history: History, judge) -> Plan:
 
     def open_chapters():
         verdicts = store.verdicts()
-        return [c for c in chapters if verdicts.get(c.id, {}).get("suitable") and c.id not in used], verdicts
+        skip = settings["content"].get("skip_title_words") or []   # never chosen, whatever the judge says
+        return [c for c in chapters if verdicts.get(c.id, {}).get("suitable") and c.id not in used
+                and not any(w in c.title for w in skip)], verdicts
 
     pool, verdicts = open_chapters()
     if len(pool) < MIN_OPEN_CHAPTERS and judge and len(verdicts) < len(chapters):

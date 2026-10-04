@@ -146,11 +146,15 @@ For each chapter (by its id) return: theme (2-5 English words), a one-sentence E
 its core teaching, and suitable=true only if the chapter carries a clear, practical, universal
 message an ordinary person of any background can apply today (e.g. love, devotion, kindness,
 humility, simple living, charity, truthfulness, discipline, mother, guru, prayer, peace of mind,
-service, the meaning of a festival or a deity told as a life lesson). suitable=false for chapters
-mainly about caste/varna duties or who may do what by birth, what women (or men) should or
-should not do, detailed ritual or dietary rules,
-debates against other schools or faiths, dense philosophy that cannot be made simple in six
-sentences, history/linguistics without a life lesson, or anything that could hurt or divide."""
+service, the meaning of a festival or a deity told as a life lesson). suitable=false for chapters mainly about any of these, however valuable in the book:
+- caste/varna duties or who may do what by birth; ritual purity rules;
+- what women (or men) should or should not do; widows; marriage age or child marriage; family planning;
+- other religions or schools (Buddhism, Jainism, Christianity, Islam), conversion, or debates against them;
+- politics, government, parties, language policy, social reformers or reform movements, foreigners;
+- scolding of modern habits (cinema, dress, education);
+- animal sacrifice; cures, medicines or health claims; astrology, planets or omens;
+- detailed ritual or dietary rules; dense philosophy that cannot be made simple in six sentences;
+  history/linguistics without a life lesson; or anything else that could hurt or divide."""
 
 JUDGE_SCHEMA = {
     "type": "object",

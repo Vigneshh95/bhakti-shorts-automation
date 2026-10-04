@@ -30,6 +30,15 @@ source = "sources/deivathin_kural"    # collected once with: python -m autopilot
 [content]
 channel_name = "BrahmaNadagam"
 source = "deivathin_kural"            # one chapter a day, never repeated, the parts in turn
+# Safety net under the AI judge: a chapter whose TITLE contains any of these is never chosen.
+skip_title_words = [
+  "வர்ண", "ஜாதி", "சாதி", "பிராம்மண", "பிராமண", "தீண்ட",                      # caste
+  "பெண்டிர்", "பெண்கள்", "ஸ்திரீ", "விதவை", "பதிவிரத", "விவாஹ வயது", "குடும்பக் கட்டுப்பாடு",  # gender, marriage age, family planning
+  "பௌத்த", "சமண", "ஜைன", "கிறிஸ்து", "இஸ்லா", "மதமாற்ற", "மிஷனரி",              # other faiths
+  "அரசாங்க", "சுயராஜ்ய", "கட்சி", "திராவிட", "ஹிந்தி", "சீர்திருத்த", "வெள்ளைக்கார",  # politics, reform, foreigners
+  "சினிமா", "ஸினிமா", "தனித்தமிழ்",                                          # modern habits, language politics
+  "ஜீவபலி", "ஜீவஹிம்ஸை", "ரோக நிவாரணி", "கிரஹ", "ஜோதிஷ", "ஜாதகம்",           # sacrifice, cures, astrology
+]
 lines_min = 6
 lines_max = 9
 max_line_chars = 70
@@ -79,9 +88,12 @@ has text painted on it, the message must agree with that text (or choose another
   theme hashtag.
 - tags: 10-20 relevant search phrases in Tamil and English about Mahaperiyava, Kanchi, Deivathin
   Kural, Sanatana Dharma and today's theme. No numbers-only or filler tags.
-Never: medical, legal or financial advice; promises of miracles, money or cures; anything about
-caste or birth-based duties; rules for what women (or men) should or should not do; criticism of
-any other faith, school or group.
+Never, even if the chapter touches on it: medical, legal or financial advice; promises of
+miracles, money or cures; astrology or predictions; caste or birth-based duties; rules for what
+women (or men) should or should not do, marriage age, widows, family planning; criticism of any
+other faith, school, group, reformer, government or of modern people; politics; animal sacrifice.
+If the chapter is mostly about these, retell only its universal lesson (devotion, kindness,
+humility, discipline) and leave the rest out.
 Return only JSON matching the schema."""
 
 review = """You are a careful Tamil editor and a devotee who knows Deivathin Kural well. Check the
@@ -89,7 +101,8 @@ script and metadata below against the chapter text given with it. Return ok=fals
 issues if ANY of these hold: it states an idea, example, quote or claim that is not in the chapter,
 or distorts what the chapter says; incorrect or unnatural Tamil, or hard words left unexplained;
 anything disrespectful to Sri Mahaperiyava, Hinduism or any faith or group; anything about caste
-or birth-based duties, or rules for what women (or men) should do; promises of miracles, cures or money; medical, legal or financial advice; a
+or birth-based duties, or rules for what women (or men) should do; rules for women or men, marriage age, widows or family planning; politics or criticism of
+reformers, governments or modern people; animal sacrifice; astrology or predictions; promises of miracles, cures or money; medical, legal or financial advice; a
 misleading or clickbait title, or a title/description implying these are his exact recorded
 words or that he himself speaks in this video (e.g. "பெரியவா இந்த பதிவில் விளக்குகிறார்",
 "Mahaperiyava explains in this video"); the message clearly doesn't fit the chosen picture's description. Minor stylistic
