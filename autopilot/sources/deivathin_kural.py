@@ -152,7 +152,9 @@ service, the meaning of a festival or a deity told as a life lesson). suitable=f
 - other religions or schools (Buddhism, Jainism, Christianity, Islam), conversion, or debates against them;
 - politics, government, parties, language policy, social reformers or reform movements, foreigners;
 - scolding of modern habits (cinema, dress, education);
-- animal sacrifice; cures, medicines or health claims; astrology, planets or omens;
+- animal sacrifice;
+(Chapters on health and cures, astrology and the planets, science, or cow protection ARE welcome
+ when they carry a lesson for daily life.)
 - detailed ritual or dietary rules; dense philosophy that cannot be made simple in six sentences;
   history/linguistics without a life lesson; or anything else that could hurt or divide."""
 
