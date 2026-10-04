@@ -34,3 +34,39 @@ jobs:
           $tail = (Get-Content pytest.log -Tail 40) -join "%0A"
           if ($code -ne 0) { Write-Host "::error title=tests failed::$tail"; exit $code }
           Write-Host "::notice title=tests::$((Get-Content pytest.log -Tail 1))"
+
+  murugan-voice:
+    # The Murugan series' voice (IndicTTS FastPitch) speaking one line on the cloud machine, and the
+    # face finder on one picture: the two laptop-side steps the test suite replaces with stand-ins.
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ci/constraints.txt
+      - name: Voice model and FFmpeg (kept between runs)
+        uses: actions/cache@v4
+        with:
+          path: |
+            checkpoints
+            tools/ffmpeg
+            SadTalker/gfpgan/weights
+          key: models-v1
+      - name: Set up the machine
+        shell: pwsh
+        run: |
+          try { ./ci/setup.ps1 } catch { Write-Host "::error title=setup failed::$($_ | Out-String)"; exit 1 }
+      - name: Speak one line and find a face
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python ci/smoke.py 2>&1 | Tee-Object -FilePath smoke.log
+          $code = $LASTEXITCODE
+          $tail = (Get-Content smoke.log -Tail 25) -join "%0A"
+          if ($code -ne 0) { Write-Host "::error title=Murugan voice check failed::$tail"; exit $code }
+          Write-Host "::notice title=Murugan voice check::$((Get-Content smoke.log | Select-String 'OK') -join ' | ')"
