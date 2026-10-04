@@ -1,6 +1,8 @@
 """Runs the stages in order: script -> TTS -> audio -> captions -> visuals -> render."""
 from __future__ import annotations
 
+import os
+
 import ctypes
 import sys
 import threading
@@ -181,6 +183,12 @@ def make_short(episode_dir: Path, preset: str | None = None, out_date: str | Non
                     if video:
                         h, w = images[0].shape[:2]
                         segments[0].video = talking.FrameSource(video, (w, h))
+
+        if (cfg.get("talking", {}).get("enabled") and os.environ.get("SHORTS_REQUIRE_TALKING") == "1"
+                and len(images) == 1 and segments[0].video is None):
+            # Unattended runs: a Short whose face should talk isn't quietly made with a still picture.
+            raise RuntimeError("The talking face couldn't be made (see the lines above); nothing was rendered. "
+                               "A later run will try again.")
 
         with timer.stage("render"):
             enc_name = render.render(segments, effects, ass, aud, cfg, work, out_path)

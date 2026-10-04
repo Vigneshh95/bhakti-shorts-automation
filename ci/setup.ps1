@@ -32,8 +32,12 @@ if (-not (Test-Path "tools/ffmpeg/bin/ffmpeg.exe")) {
 Write-Host "== SadTalker code (the laptop's working copy) and its face models"
 if (-not (Test-Path "SadTalker/inference.py")) {
     Expand-Archive "shorts/vendor/sadtalker_code.zip" -DestinationPath $env:TEMP -Force
-    Copy-Item (Join-Path $env:TEMP "sadtalker") "SadTalker" -Recurse -Force
+    # Copy the CONTENTS: the SadTalker folder may already exist (its model files come back from the
+    # cache), and copying the folder itself would then land one level too deep.
+    New-Item -ItemType Directory -Force "SadTalker" | Out-Null
+    Copy-Item (Join-Path $env:TEMP "sadtalker/*") "SadTalker" -Recurse -Force
 }
+if (-not (Test-Path "SadTalker/inference.py")) { throw "SadTalker code is not in place (SadTalker/inference.py missing)" }
 New-Item -ItemType Directory -Force "SadTalker/gfpgan/weights" | Out-Null
 foreach ($f in "alignment_WFLW_4HG.pth", "detection_Resnet50_Final.pth") {
     if (-not (Test-Path "SadTalker/gfpgan/weights/$f")) {

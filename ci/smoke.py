@@ -10,7 +10,11 @@ from shorts.cache import Cache
 from shorts.config import ROOT, load_config
 from shorts.stages import audio, mouth, tts
 
+from shorts.log import setup_logging
+
+setup_logging(False)   # so a failing step says why
 cfg = load_config()
+assert (ROOT / cfg["talking"]["dir"] / "inference.py").exists(), "SadTalker code is not in place"
 work = Path(tempfile.mkdtemp())
 cache = Cache(work / "cache")
 voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], 4)

@@ -74,7 +74,10 @@ jobs:
           if ($upload -eq "true" -and (Test-Path $history)) {
             $done = [bool](Get-Content $history -Raw -Encoding utf8 | ConvertFrom-Json | Where-Object { $_.date -eq $day -and $_.video_id })
           }
-          "series=$series", "upload=$upload", "day=$day", "todo=$(if ($done) { 'no' } else { 'yes' })" | Add-Content $env:GITHUB_OUTPUT
+          # The first start of the day insists on the talking face (a failure is retried by the
+          # second start); the second start posts with a still picture rather than not at all.
+          $strict = if ("${{ github.event.schedule }}" -match "^47 ") { "0" } else { "1" }
+          "series=$series", "upload=$upload", "day=$day", "strict=$strict", "todo=$(if ($done) { 'no' } else { 'yes' })" | Add-Content $env:GITHUB_OUTPUT
           if ($done) { Write-Host "::notice title=$series::Already uploaded for $day -- nothing to do" }
           else { Write-Host "::notice title=$series::Making the Short for $day (upload: $upload)" }
 
@@ -121,13 +124,18 @@ jobs:
       - name: Make the Short
         if: steps.plan.outputs.todo == 'yes'
         shell: pwsh
+        env:
+          SHORTS_REQUIRE_TALKING: ${{ steps.plan.outputs.strict }}
         run: |
           $extra = @(); if ("${{ steps.plan.outputs.upload }}" -ne "true") { $extra += "--no-upload" }
           python -m autopilot --series ${{ steps.plan.outputs.series }} run --scheduled --date ${{ steps.plan.outputs.day }} @extra 2>&1 | Tee-Object -FilePath run.log
           $code = $LASTEXITCODE
-          $last = (Get-Content run.log | Where-Object { $_ -match "✅|⏸|ERROR|Uploaded|stopped|Already" } | Select-Object -Last 6) -join "%0A"
+          $last = (Get-Content run.log | Where-Object { $_ -match "✅|⏸|ERROR|WARNING|Uploaded|stopped|Already|talking head|animated" } | Select-Object -Last 10) -join "%0A"
           if ($code -ne 0) { Write-Host "::error title=the Short was not made::$last"; exit $code }
           if ($last -match "⏸") { Write-Host "::error title=made but NOT uploaded (YouTube sign-in expired: update the YT_TOKEN_JSON secret)::$last"; exit 1 }
+          if (Select-String -Path run.log -Pattern "talking head skipped|using the still picture|no laptop fallback" -Quiet) {
+            Write-Host "::warning title=${{ steps.plan.outputs.series }}: made WITHOUT the talking face (still picture)::$last"
+          }
           Write-Host "::notice title=${{ steps.plan.outputs.series }}::$last"
 
       - name: The video (kept 7 days)
