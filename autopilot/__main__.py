@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--date", type=date.fromisoformat)
     r.add_argument("--scheduled", action="store_true", help="unattended: never open a browser")
     sub.add_parser("check")
+    sub.add_parser("signin")
     sy = sub.add_parser("sync")
     sy.add_argument("--restore", action="store_true", help="also copy every shared file into place (a fresh machine)")
     pc = sub.add_parser("pictures")
@@ -65,6 +66,14 @@ def main(argv: list[str] | None = None) -> int:
             log.info("%s", "✅ Pictures and history are the same here and in the cloud" if ok
                      else "Couldn't reach the shared copy -- check the internet and try again")
             return 0 if ok else 1
+        elif args.cmd == "signin":
+            from autopilot import youtube
+
+            name = youtube.sign_in_again()
+            token = youtube.channel_config()["token_file"]
+            log.info("✅ Signed in to YouTube: channel '%s'", name)
+            log.info("For the cloud runs: open %s in Notepad, copy everything, and paste it into the", token.name)
+            log.info("YT_TOKEN_JSON secret on GitHub (Settings > Secrets and variables > Actions).")
         elif args.cmd == "check":
             return _check(args.series)
         elif args.cmd == "source":

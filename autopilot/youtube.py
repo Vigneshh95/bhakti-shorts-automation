@@ -107,6 +107,20 @@ def _credentials(channel: dict, interactive: bool):
     return creds
 
 
+def sign_in_again() -> str:
+    """Opens the browser for a fresh YouTube sign-in even if the saved one still works, and saves
+    it. Needed once after the Google Cloud app is switched from Testing to In production: a
+    sign-in issued in Testing stops working after 7 days, one issued in production does not.
+    Returns the channel name."""
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    channel = channel_config()
+    flow = InstalledAppFlow.from_client_secrets_file(str(channel["client_secrets"]), SCOPES)
+    creds = flow.run_local_server(port=0, prompt="consent", access_type="offline")
+    channel["token_file"].write_text(creds.to_json(), encoding="utf-8")
+    return check_sign_in()
+
+
 def upload(video: Path, script: Script, settings: dict, publish_at: datetime | None, interactive: bool) -> str:
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
