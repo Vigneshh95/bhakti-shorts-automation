@@ -130,7 +130,7 @@ jobs:
           $extra = @(); if ("${{ steps.plan.outputs.upload }}" -ne "true") { $extra += "--no-upload" }
           python -m autopilot --series ${{ steps.plan.outputs.series }} run --scheduled --date ${{ steps.plan.outputs.day }} @extra 2>&1 | Tee-Object -FilePath run.log
           $code = $LASTEXITCODE
-          $last = (Get-Content run.log | Where-Object { $_ -match "✅|⏸|ERROR|WARNING|Uploaded|stopped|Already|talking head|animated" } | Select-Object -Last 10) -join "%0A"
+          $last = (Get-Content run.log | Where-Object { $_ -match "^\d\d:\d\d:\d\d (INFO|WARNING|ERROR)" -and $_ -match "✅|⏸|ERROR|WARNING|Uploaded|stopped|Already|talking head|animated|title:" } | Select-Object -Last 10) -join "%0A"
           if ($code -ne 0) { Write-Host "::error title=the Short was not made::$last"; exit $code }
           if ($last -match "⏸") { Write-Host "::error title=made but NOT uploaded (YouTube sign-in expired: update the YT_TOKEN_JSON secret)::$last"; exit 1 }
           if (Select-String -Path run.log -Pattern "talking head skipped|using the still picture|no laptop fallback" -Quiet) {
