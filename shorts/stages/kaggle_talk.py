@@ -21,7 +21,23 @@ from pathlib import Path
 from shorts.config import ROOT
 from shorts.log import log
 
-KAGGLE = ROOT / ".venv" / "Scripts" / "kaggle.exe"
+def _kaggle_tool() -> Path:
+    """The kaggle command: the project's own .venv on the laptop; elsewhere (the cloud runner has
+    no .venv) the one installed next to the running Python, or on PATH."""
+    import sys
+
+    local = ROOT / ".venv" / "Scripts" / "kaggle.exe"
+    if local.exists():
+        return local
+    beside = Path(sys.executable).parent
+    for cand in (beside / "Scripts" / "kaggle.exe", beside / "kaggle.exe", beside / "kaggle"):
+        if cand.exists():
+            return cand
+    found = shutil.which("kaggle")
+    return Path(found) if found else local
+
+
+KAGGLE = _kaggle_tool()
 RUNNER = Path(__file__).resolve().parent.parent / "vendor" / "kaggle_sadtalker.py"
 KERNEL_SLUG = "murugan-talking"
 
