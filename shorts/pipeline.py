@@ -98,6 +98,18 @@ def _light_lipsync(picture, voice_wav, cfg: dict, cache: Cache, work: Path):
     return mouth.MouthAnimator(picture, points, voice_wav, cfg["video"]["fps"], t, seed=cfg["effects"]["kenburns"].get("seed", 7))
 
 
+def work_folder(cfg: dict, episode_dir: Path) -> Path:
+    """Scratch files (voice, mix, captions) for ONE episode. Named after the episode's whole path
+    under episodes/, not just its last part: the two daily series both have a folder called
+    <date>, and when they shared one scratch folder a run rendered with the other's audio and
+    captions (Murugan's picture with Mahaperiyava's voice, 2026-10-04)."""
+    try:
+        tag = "_".join(episode_dir.resolve().relative_to(cfg["paths"]["episodes"].resolve()).parts)
+    except ValueError:
+        tag = "_".join(episode_dir.resolve().parts[-2:])
+    return cfg["paths"]["cache"] / "work" / tag
+
+
 def make_short(episode_dir: Path, preset: str | None = None, out_date: str | None = None,
                voice_style: str | None = None, output: Path | None = None) -> RunResult:
     cfg = load_config(episode_dir, preset)
@@ -113,7 +125,7 @@ def make_short(episode_dir: Path, preset: str | None = None, out_date: str | Non
             raise FileNotFoundError(f"FFmpeg not found at {cfg['paths'][key]} -- see README 'Setup'.")
 
     timer, cache = StageTimer(), Cache(cfg["paths"]["cache"])
-    work = cfg["paths"]["cache"] / "work" / episode_dir.name
+    work = work_folder(cfg, episode_dir)
     work.mkdir(parents=True, exist_ok=True)
     out_dir = cfg["paths"]["output"]
     out_dir.mkdir(parents=True, exist_ok=True)

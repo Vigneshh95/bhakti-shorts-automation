@@ -119,25 +119,54 @@ def _chapter_plan(day: date, settings: dict, history: History, judge) -> Plan:
         return [c for c in chapters if verdicts.get(c.id, {}).get("suitable") and c.id not in used], verdicts
 
     pool, verdicts = open_chapters()
-    if len(pool) < 3 and judge and len(verdicts) < len(chapters):
-        # judge the next chapters in turn across the parts, a couple of requests' worth
-        dk.judge(store, judge, limit=24, order=_part_rotation(chapters))
+    if len(pool) < MIN_OPEN_CHAPTERS and judge and len(verdicts) < len(chapters):
+        # judge some more, taken from all over the book (a couple of requests' worth)
+        try:
+            dk.judge(store, judge, limit=24, order=_spread(chapters))
+        except Exception:  # noqa: BLE001 -- the judge is busy: today's choice is made from what is judged
+            if not pool:
+                raise
         pool, verdicts = open_chapters()
     if not pool:
         raise RuntimeError("No suitable Deivathin Kural chapter left to retell (all used or not judged yet)")
     parts = sorted({c.part for c in pool})
     part = parts[day.toordinal() % len(parts)]                      # a different part each day
-    chapter = min((c for c in pool if c.part == part), key=lambda c: c.index)  # book order within it
+    in_part = sorted((c for c in pool if c.part == part), key=lambda c: c.index)
+    # ...and a different subject from the last days: each part opens with several talks on the same
+    # deity, and consecutive Shorts on one subject feel like repeats even when the chapters differ.
+    recent = _subject_stems(history.recent_titles(7))
+    fresh = [c for c in in_part if not _subject_stems([c.title]) & recent] or in_part
+    chapter = random.Random(day.toordinal()).choice(fresh)          # same day -> same pick if re-run
     v = verdicts[chapter.id]
     return Plan(day, v["theme"], source={"id": chapter.id, "credit": chapter.credit, "url": chapter.url,
                                          "title": chapter.title, "text": chapter.text[:12000]})
 
 
-def _part_rotation(chapters: list) -> list:
-    """Chapters ordered 1st of part 1, 1st of part 2, … 2nd of part 1, … (so judging spreads)."""
+MIN_OPEN_CHAPTERS = 20   # keep at least this many judged, unused chapters to choose from
+_NOT_SUBJECTS = {"பெரியவா", "அருள்வாக்கு", "தெய்வத்தின்", "மகிமை", "மகிமையும்"}
+
+
+def _subject_stems(titles: list[str]) -> set[str]:
+    """The leading letters of each longer word in the titles: 'விநாயகர்', 'விநாயகரின்' and
+    'விநாயகரை' all give the same stem, so a subject is recognised in any of its forms."""
+    stems = set()
+    for title in titles:
+        for word in title.replace("|", " ").split():
+            word = word.strip(" .,;:!?\"'()")
+            if len(word) >= 6 and word not in _NOT_SUBJECTS and "஀" <= word[0] <= "௿":
+                stems.add(word[:6])
+    return stems
+
+
+def _spread(chapters: list) -> list:
+    """The order chapters are judged in: mixed within each part (always the same way), the parts
+    in turn. So the judged chapters, and with them the daily choice, come from all over the book
+    instead of each part's opening pages."""
     by_part: dict[int, list] = {}
     for c in sorted(chapters, key=lambda c: (c.part, c.index)):
         by_part.setdefault(c.part, []).append(c)
+    for part, group in by_part.items():
+        random.Random(1000 + part).shuffle(group)
     out, i = [], 0
     while any(i < len(v) for v in by_part.values()):
         out += [v[i] for v in by_part.values() if i < len(v)]

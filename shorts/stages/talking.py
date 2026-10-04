@@ -79,7 +79,10 @@ def animate(picture: np.ndarray, voice_wav: Path, cfg: dict, cache: Cache, work:
             if points is None:
                 raise kaggle_talk.KaggleUnavailable("no face found in the picture")
             return kaggle_talk.animate(src, voice_wav, points, cfg["paths"]["ffmpeg"], work, out,
-                                       int(t.get("kaggle_timeout_min", 40)))
+                                       int(t.get("kaggle_timeout_min", 40)),
+                                       # one notebook per series: two series running at once must not
+                                       # replace each other's job
+                                       t.get("kaggle_kernel", kaggle_talk.KERNEL_SLUG))
         except kaggle_talk.KaggleUnavailable as e:
             if t.get("kaggle_fallback", "sadtalker") != "sadtalker":
                 log.warning("  Kaggle unavailable (%s); no laptop fallback configured", e)

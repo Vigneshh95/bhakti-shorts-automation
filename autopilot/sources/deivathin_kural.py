@@ -147,7 +147,8 @@ its core teaching, and suitable=true only if the chapter carries a clear, practi
 message an ordinary person of any background can apply today (e.g. love, devotion, kindness,
 humility, simple living, charity, truthfulness, discipline, mother, guru, prayer, peace of mind,
 service, the meaning of a festival or a deity told as a life lesson). suitable=false for chapters
-mainly about caste/varna duties or who may do what by birth, detailed ritual or dietary rules,
+mainly about caste/varna duties or who may do what by birth, what women (or men) should or
+should not do, detailed ritual or dietary rules,
 debates against other schools or faiths, dense philosophy that cannot be made simple in six
 sentences, history/linguistics without a life lesson, or anything that could hurt or divide."""
 

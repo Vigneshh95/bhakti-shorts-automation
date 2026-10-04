@@ -42,7 +42,7 @@ def _store(tmp_path: Path) -> dk.Store:
     return store
 
 
-def test_chapter_plan_rotates_parts_in_book_order_and_never_repeats(tmp_path):
+def test_chapter_plan_rotates_parts_and_never_repeats(tmp_path):
     store = _store(tmp_path)
     calls = []
 
@@ -54,7 +54,7 @@ def test_chapter_plan_rotates_parts_in_book_order_and_never_repeats(tmp_path):
     settings = {"content": {"source": "deivathin_kural"}, "paths": {"source": store.folder}}
     h = planner.History(tmp_path / "h.json")
     first = planner.plan_day(date(2026, 10, 1), settings, h, judge)
-    assert calls and first.source["id"] in {"1:p1c2.htm", "2:p2c1.htm"}  # book order within the part
+    assert calls and first.source["id"] != "1:p1c1.htm"  # only chapters judged suitable
     assert first.source["credit"].startswith("தெய்வத்தின் குரல்,") and "அன்பு" in first.context()
     h.add({"date": "2026-10-01", "source_id": first.source["id"], "theme": "love"})
     second = planner.plan_day(date(2026, 10, 2), settings, h, judge)
@@ -169,3 +169,43 @@ def test_shared_history_merges_both_sides_once():
     merged = sync.merge_histories(a, b)
     assert [r["made_at"] for r in merged] == ["t1", "t2", "t3"]   # nothing lost, nothing doubled, in order
     assert planner.History.__new__(planner.History) is not None
+
+
+def test_each_series_has_its_own_scratch_folder_and_kaggle_notebook(tmp_path):
+    """Two series run on the same date (even at the same moment) must not share any file."""
+    from shorts.pipeline import work_folder
+
+    cfg = load_config()
+    eps = cfg["paths"]["episodes"]
+    murugan, periyava = work_folder(cfg, eps / "auto" / "2026-10-04"), work_folder(cfg, eps / "periyava" / "2026-10-04")
+    assert murugan != periyava and murugan.name == "auto_2026-10-04" and periyava.name == "periyava_2026-10-04"
+    assert work_folder(cfg, eps / "my-episode").name == "my-episode"   # manual episodes keep their name
+    m, p = load_settings(), load_settings(series="periyava")
+    sc = S.to_script(GOOD, "t")
+    (tmp_path / "m").mkdir(); (tmp_path / "p").mkdir()
+    (tmp_path / "m" / "episode.toml").write_text(_episode_toml(sc, m["look"], m.get("video")), encoding="utf-8")
+    (tmp_path / "p" / "episode.toml").write_text(_episode_toml(sc, p["look"], p.get("video")), encoding="utf-8")
+    cm, cp = load_config(tmp_path / "m"), load_config(tmp_path / "p")
+    assert cm["talking"].get("kaggle_kernel", "murugan-talking") != cp["talking"]["kaggle_kernel"]
+    # and each keeps its own voice and music
+    assert cm["voice"].get("engine", "fastpitch") == "fastpitch" and cp["voice"]["engine"] == "indicf5"
+    assert cm["paths"]["bgm"].name == "murugan_baby.mp3" and cp["paths"]["bgm"].name != "murugan_baby.mp3"
+    assert cm["voice"]["style"] == "baby" and cp["voice"]["style"] == "periyava"
+
+
+def test_chapter_choice_avoids_the_subject_of_recent_days(tmp_path):
+    """Different chapters on one subject (each part opens with several on Pillaiyar) on
+    consecutive days feel like repeats: the next day's chapter is on something else."""
+    store = dk.Store(tmp_path / "dk")
+    store.folder.mkdir()
+    titles = ["விநாயகர்", "தத்துவமயமான விநாயகர்", "அம்மா", "விநாயகரும் தமிழும்"]
+    rows = [{"part": 1, "index": i, "title": t, "url": f"{dk.BASE}c{i}.htm", "text": "அன்பு " * 100}
+            for i, t in enumerate(titles, 1)]
+    store.path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    store.save_verdicts({f"1:c{i}.htm": {"theme": "t", "summary": "s", "suitable": True} for i in range(1, 5)})
+    settings = {"content": {"source": "deivathin_kural"}, "paths": {"source": store.folder}}
+    h = planner.History(tmp_path / "h.json")
+    h.add({"date": "2026-10-04", "source_id": "1:c1.htm", "theme": "t", "title": "மகா பெரியவா | விநாயகரின் எளிமை"})
+    for day in range(5, 12):   # whatever the day, yesterday's subject isn't taken again
+        assert planner.plan_day(date(2026, 10, day), settings, h, None).source["title"] == "அம்மா"
+    assert planner._subject_stems(["விநாயகர்"]) == planner._subject_stems(["விநாயகரின்"])

@@ -140,7 +140,7 @@ def _script_with_inputs(face_jpg: bytes, voice_ogg: bytes, code_zip: bytes) -> s
 
 
 def animate(picture_png: Path, voice_wav: Path, points, ffmpeg: Path, work: Path, out: Path,
-            timeout_min: int = 40) -> Path:
+            timeout_min: int = 40, slug: str = KERNEL_SLUG) -> Path:
     """Runs SadTalker on Kaggle for the face region and blends the animated face back into the
     full picture. Returns `out` (full-size talking video) or raises KaggleUnavailable."""
     import cv2
@@ -166,14 +166,14 @@ def animate(picture_png: Path, voice_wav: Path, points, ffmpeg: Path, work: Path
     (kernel / "kaggle_sadtalker.py").write_text(script, encoding="utf-8")
     log.debug("Kaggle notebook size: %d KB", len(script) // 1024)
     (kernel / "kernel-metadata.json").write_text(json.dumps({
-        "id": f"{user}/{KERNEL_SLUG}", "title": KERNEL_SLUG, "code_file": "kaggle_sadtalker.py",
+        "id": f"{user}/{slug}", "title": slug, "code_file": "kaggle_sadtalker.py",
         "language": "python", "kernel_type": "script", "is_private": True, "enable_gpu": True,
         "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": []}),
         encoding="utf-8")
     log.info("  sending the face and voice to your private Kaggle notebook and starting the free GPU…")
     _kaggle("kernels", "push", "-p", ".", cwd=kernel, timeout=900)
 
-    ref = f"{user}/{KERNEL_SLUG}"
+    ref = f"{user}/{slug}"
     end = time.time() + timeout_min * 60
     last_note = 0.0
     failures: list[float] = []
