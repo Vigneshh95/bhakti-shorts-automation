@@ -274,10 +274,10 @@ Each day's Short retells the essence of one *Deivathin Kural* chapter in simple 
 
 **In the cloud (in use): GitHub Actions**, with the laptop off. The workflow "Make a Short" starts by itself every day, makes the Short (Kaggle does the voice and face as usual) and uploads it:
 
-| Series | Starts (IST) | Goes public (IST) | Second chance if the first start failed |
+| Series | Starts (IST) | Goes public (IST) | Further starts if it isn't uploaded yet |
 |---|---|---|---|
-| Murugan | 05:47 | 18:30 the same day | 08:17 |
-| Mahaperiyava | 18:47 | 06:30 the next morning | 21:17 |
+| Murugan | 05:47 | 18:30 the same day | 08:17, 11:17 |
+| Mahaperiyava | 18:47 | 06:30 the next morning | 21:17, 23:17 |
 
 GitHub may start a scheduled run some minutes late. If a run fails, GitHub emails you; the run page shows why. It can also be started by hand: Actions tab → Make a Short → Run workflow.
 

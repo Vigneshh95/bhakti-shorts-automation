@@ -5,8 +5,8 @@ name: Make a Short
 #
 #   Murugan       starts 05:47 IST  -> public 18:30 IST the same day
 #   Mahaperiyava  starts 18:47 IST  -> public 06:30 IST the next morning
-# Each has a second start 2.5 hours later: it does nothing if the first one uploaded, and makes
-# the Short if the first one failed (e.g. the script writer was busy).
+# Each has two more starts later (2.5 and 5 hours): they do nothing if the Short is already
+# uploaded, and make it if an earlier start failed or GitHub never started it.
 # It can also be started by hand: Actions tab > Make a Short > Run workflow.
 #
 # Private files (pictures, voice sample, music, chapter text) and the shared history live in a
@@ -14,10 +14,13 @@ name: Make a Short
 # same history, so a Short is never posted twice. Keys are repository secrets.
 on:
   schedule:
-    - cron: "17 0 * * *"    # Murugan
-    - cron: "47 2 * * *"    # Murugan, second chance
-    - cron: "17 13 * * *"   # Mahaperiyava
-    - cron: "47 15 * * *"   # Mahaperiyava, second chance
+    # (UTC. Hours before 12 are Murugan, after 12 Mahaperiyava; minute 17 = the day's first start.)
+    - cron: "17 0 * * *"    # Murugan        05:47 IST
+    - cron: "47 2 * * *"    # Murugan        08:17 IST, second chance
+    - cron: "47 5 * * *"    # Murugan        11:17 IST, third chance
+    - cron: "17 13 * * *"   # Mahaperiyava   18:47 IST
+    - cron: "47 15 * * *"   # Mahaperiyava   21:17 IST, second chance
+    - cron: "47 17 * * *"   # Mahaperiyava   23:17 IST, third chance
   workflow_dispatch:
     inputs:
       series:
@@ -64,7 +67,8 @@ jobs:
         run: |
           $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
           if ("${{ github.event_name }}" -eq "schedule") {
-            $series = if ("${{ github.event.schedule }}" -match "^(17 0|47 2) ") { "murugan" } else { "periyava" }
+            $hour = [int]("${{ github.event.schedule }}".Split(" ")[1])
+            $series = if ($hour -lt 12) { "murugan" } else { "periyava" }
             $upload = "true"
           }
           $day = [DateTime]::UtcNow.AddHours(5.5).ToString("yyyy-MM-dd")   # the date in India
@@ -76,6 +80,7 @@ jobs:
           }
           # The first start of the day insists on the talking face (a failure is retried by the
           # second start); the second start posts with a still picture rather than not at all.
+          # (GitHub sometimes starts a scheduled run late or not at all, hence the extra starts.)
           $strict = if ("${{ github.event.schedule }}" -match "^47 ") { "0" } else { "1" }
           "series=$series", "upload=$upload", "day=$day", "strict=$strict", "todo=$(if ($done) { 'no' } else { 'yes' })" | Add-Content $env:GITHUB_OUTPUT
           if ($done) { Write-Host "::notice title=$series::Already uploaded for $day -- nothing to do" }
