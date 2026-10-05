@@ -149,33 +149,42 @@ def _chapter_plan(day: date, settings: dict, history: History, judge) -> Plan:
                                          "title": chapter.title, "text": chapter.text[:12000]})
 
 
+# The book's recurring subjects, each with the word-beginnings that name it. A chapter is "about"
+# a subject when these words are frequent in its TEXT (titles often don't name the subject:
+# "உலகுக்கெல்லாம் சொந்தமானவர்" is about Pillaiyar).
+SUBJECTS = {
+    "pillaiyar": ["பிள்ளையா", "விநாயக", "கணபதி", "கணேச", "விக்நேச", "விக்னேச", "கணாதிப"],
+    "murugan": ["முருக", "சுப்ரம", "ஸுப்ரஹ்ம", "ஷண்முக", "குமாரஸ்வாமி", "கந்தன்"],
+    "ambal": ["அம்பாள்", "அம்பாளி", "அம்பாளை", "அம்பிகை", "காமாக்ஷி", "பராசக்தி", "லலிதா"],
+    "shiva": ["சிவன்", "சிவனை", "சிவனு", "பரமேச்வர", "பரமேசுவர", "நடராஜ", "பரமசிவ", "சிவபெருமா"],
+    "vishnu": ["விஷ்ணு", "நாராயண", "மஹாவிஷ்ணு", "பெருமாள்", "பெருமாளை"],
+    "rama": ["ராமர்", "ராமன்", "ராமனை", "ஸ்ரீராம", "ராமாயண", "ஸீதை"],
+    "krishna": ["கிருஷ்ண", "க்ருஷ்ண", "கண்ணன்", "கீதை", "கீதையி"],
+    "guru": ["குருவை", "குருவி", "குருவு", "குருவா", "குரு ", "சிஷ்ய"],
+    "sankara": ["சங்கரர்", "ஆசார்யாள்", "பகவத்பாத", "ஆதிசங்கர"],
+    "avvai": ["அவ்வை", "ஒளவை", "ஔவை"],
+    "veda": ["வேதம்", "வேதத்", "வேதங்கள", "மந்திர"],
+    "advaita": ["அத்வைத", "பிரம்மம்", "ப்ரஹ்மம்", "மாயை"],
+    "charity": ["தானம்", "தர்மம் செய்", "பரோபகார", "அன்னதான"],
+    "mother": ["அம்மா", "தாயார்", "தாயன்ப"],
+}
+
+
 class _Subjects:
-    """What each chapter is mainly about, read from its text: the few longer words it uses most
-    that are NOT common across the book (so 'பிள்ளையார்' counts, 'என்று' and 'இருக்கிறது' don't).
-    A chapter's title often doesn't name its subject ("உலகுக்கெல்லாம் சொந்தமானவர்" is about
-    Pillaiyar), so titles alone let the same subject through day after day."""
+    """The main subject(s) of a chapter, counted in its text."""
 
-    def __init__(self, chapters: list):
-        self.n = len(chapters)
-        self._stems = {c.id: self._count(c.text) for c in chapters}
-        self.spread: dict[str, int] = {}
-        for counts in self._stems.values():
-            for stem in counts:
-                self.spread[stem] = self.spread.get(stem, 0) + 1
-
-    @staticmethod
-    def _count(text: str) -> dict[str, int]:
-        counts: dict[str, int] = {}
-        for word in text.replace("‌", "").replace("‍", "").split():   # invisible joiners inside words
-            word = word.strip(" .,;:!?\"'()‘’“”-")
-            if len(word) >= 6 and "஀" <= word[0] <= "௿":
-                counts[word[:6]] = counts.get(word[:6], 0) + 1
-        return counts
+    def __init__(self, chapters: list | None = None):
+        self._cache: dict[str, set[str]] = {}
 
     def of(self, chapter) -> set[str]:
-        counts = self._stems.get(chapter.id) or self._count(chapter.text)
-        rare = {s: n for s, n in counts.items() if n >= 4 and self.spread.get(s, 0) < 0.08 * max(self.n, 1)}
-        return set(sorted(rare, key=lambda s: -rare[s])[:4])
+        if chapter.id not in self._cache:
+            text = chapter.text.replace("‌", "").replace("‍", "")   # invisible joiners inside words
+            per_1000 = 1000 / max(len(text), 1)
+            hits = {name: sum(text.count(w) for w in words) for name, words in SUBJECTS.items()}
+            hits = {n: c for n, c in hits.items() if c >= 3 and c * per_1000 >= 1.0}   # really a subject, not a mention
+            top = max(hits.values(), default=0)
+            self._cache[chapter.id] = {n for n, c in hits.items() if c >= 0.6 * top}
+        return self._cache[chapter.id]
 
 
 MIN_OPEN_CHAPTERS = 20   # keep at least this many judged, unused chapters to choose from
