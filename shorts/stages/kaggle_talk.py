@@ -40,6 +40,12 @@ def _kaggle_tool() -> Path:
 KAGGLE = _kaggle_tool()
 RUNNER = Path(__file__).resolve().parent.parent / "vendor" / "kaggle_sadtalker.py"
 KERNEL_SLUG = "murugan-talking"
+# Every notebook runs on this exact Kaggle environment (Python 3.12), the one all the runners were
+# built and tested on. Without it a NEW notebook gets Kaggle's newest image (Python 3.13 since
+# October 2026), where the pinned packages no longer install -- while older notebooks keep theirs.
+# When moving to a newer image: test each runner on it first, then change this one line.
+KAGGLE_IMAGE = "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461"
+ENVIRONMENT = {"docker_image": KAGGLE_IMAGE, "docker_image_pinning_type": "original"}
 
 
 class KaggleUnavailable(RuntimeError):
@@ -168,7 +174,7 @@ def animate(picture_png: Path, voice_wav: Path, points, ffmpeg: Path, work: Path
     (kernel / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{user}/{slug}", "title": slug, "code_file": "kaggle_sadtalker.py",
         "language": "python", "kernel_type": "script", "is_private": True, "enable_gpu": True,
-        "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": []}),
+        "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": [], **ENVIRONMENT}),
         encoding="utf-8")
     log.info("  sending the face and voice to your private Kaggle notebook and starting the free GPU…")
     _kaggle("kernels", "push", "-p", ".", cwd=kernel, timeout=900)
@@ -243,13 +249,21 @@ def _composite(picture, face_video: Path, box, points, ffmpeg: Path, out: Path) 
 
 
 def _fetch_output(ref: str, work: Path) -> Path:
+    """Downloads the notebook's output files. Kaggle can report a run complete a little before
+    its files can be fetched (seen 2026-10-05: an empty download, the video there a minute
+    later), so an empty result is asked for again a few times."""
     dest = work / "kaggle_output"
-    shutil.rmtree(dest, ignore_errors=True)
-    dest.mkdir(parents=True)
-    try:
-        _kaggle("kernels", "output", ref, "-p", ".", "-o", cwd=dest, timeout=900)
-    except KaggleUnavailable as e:
-        log.debug("couldn't fetch Kaggle output: %s", e)
+    for attempt in range(5):
+        shutil.rmtree(dest, ignore_errors=True)
+        dest.mkdir(parents=True)
+        try:
+            _kaggle("kernels", "output", ref, "-p", ".", "-o", cwd=dest, timeout=900)
+        except KaggleUnavailable as e:
+            log.debug("couldn't fetch Kaggle output: %s", e)
+        if any(p.suffix != ".log" for p in dest.iterdir()):
+            break
+        if attempt < 4:
+            time.sleep(20)
     return dest
 
 
@@ -267,7 +281,7 @@ def run_kernel(slug: str, script: str, work: Path, timeout_min: int, doing: str 
     (kernel / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{user}/{slug}", "title": slug, "code_file": "script.py", "language": "python",
         "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_internet": True,
-        "dataset_sources": [], "competition_sources": [], "kernel_sources": []}), encoding="utf-8")
+        "dataset_sources": [], "competition_sources": [], "kernel_sources": [], **ENVIRONMENT}), encoding="utf-8")
     t0 = time.time()
     _kaggle("kernels", "push", "-p", ".", cwd=kernel, timeout=900)
     ref, failures, last_note = f"{user}/{slug}", [], time.time()

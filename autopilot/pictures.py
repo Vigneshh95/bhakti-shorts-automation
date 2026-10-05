@@ -90,7 +90,7 @@ def paint(folder: Path, count: int = 20, timeout_min: int | None = None) -> list
     (kernel / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{user}/{KERNEL_SLUG}", "title": KERNEL_SLUG, "code_file": "kaggle_pictures.py",
         "language": "python", "kernel_type": "script", "is_private": True, "enable_gpu": True,
-        "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": []}),
+        "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": [], **kaggle_talk.ENVIRONMENT}),
         encoding="utf-8")
     t0 = time.time()
     minutes = 14 + 5 * count  # measured on the free T4: ~14 min to set up, then ~5 min a picture

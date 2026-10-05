@@ -274,10 +274,12 @@ Each day's Short retells the essence of one *Deivathin Kural* chapter in simple 
 
 **In the cloud (in use): GitHub Actions**, with the laptop off. The workflow "Make a Short" starts by itself every day, makes the Short (Kaggle does the voice and face as usual) and uploads it:
 
-| Series | Starts (IST) | Goes public (IST) | Further starts if it isn't uploaded yet |
-|---|---|---|---|
-| Murugan | 05:47 | 18:30 the same day | 08:17, 11:17 |
-| Mahaperiyava | 18:47 | 06:30 the next morning | 21:17, 23:17 |
+| Series | Starts (IST) | Goes public (IST) |
+|---|---|---|
+| Murugan | 03:47, 06:17, 09:17 | 18:30 the same day |
+| Mahaperiyava | 14:47, 17:17, 20:17 | 06:30 the next morning |
+
+The first start that succeeds makes and uploads the Short; the later ones see it is done and stop in seconds. They are there because GitHub runs schedules late (often by hours) or skips one. A scheduled run never posts a Short whose face doesn't talk: it fails and the next start tries again. Every Kaggle notebook runs on one fixed Kaggle environment (`KAGGLE_IMAGE` in `shorts/stages/kaggle_talk.py`).
 
 GitHub may start a scheduled run some minutes late. If a run fails, GitHub emails you; the run page shows why. It can also be started by hand: Actions tab → Make a Short → Run workflow.
 

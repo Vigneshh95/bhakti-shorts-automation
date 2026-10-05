@@ -3,10 +3,10 @@ name: Make a Short
 # The daily Shorts, made and uploaded in the cloud with the laptop switched off: the same
 # autopilot as the .bat files.
 #
-#   Murugan       starts 05:47 IST  -> public 18:30 IST the same day
-#   Mahaperiyava  starts 18:47 IST  -> public 06:30 IST the next morning
-# Each has two more starts later (2.5 and 5 hours): they do nothing if the Short is already
-# uploaded, and make it if an earlier start failed or GitHub never started it.
+#   Murugan       starts 03:47, 06:17, 09:17 IST   -> public 18:30 IST the same day
+#   Mahaperiyava  starts 14:47, 17:17, 20:17 IST   -> public 06:30 IST the next morning
+# The first start that succeeds makes and uploads the Short; later starts see it is done and stop
+# in seconds. They exist because GitHub runs schedules late (often by hours) or skips one.
 # It can also be started by hand: Actions tab > Make a Short > Run workflow.
 #
 # Private files (pictures, voice sample, music, chapter text) and the shared history live in a
@@ -14,13 +14,15 @@ name: Make a Short
 # same history, so a Short is never posted twice. Keys are repository secrets.
 on:
   schedule:
-    # (UTC. Hours before 12 are Murugan, after 12 Mahaperiyava; minute 17 = the day's first start.)
-    - cron: "17 0 * * *"    # Murugan        05:47 IST
-    - cron: "47 2 * * *"    # Murugan        08:17 IST, second chance
-    - cron: "47 5 * * *"    # Murugan        11:17 IST, third chance
-    - cron: "17 13 * * *"   # Mahaperiyava   18:47 IST
-    - cron: "47 15 * * *"   # Mahaperiyava   21:17 IST, second chance
-    - cron: "47 17 * * *"   # Mahaperiyava   23:17 IST, third chance
+    # Times are UTC. GitHub starts scheduled runs late, often by hours (seen: 1 to 5 hours),
+    # so every start is early enough that even a 5-hour delay still meets the publish time, and
+    # each series has three starts. Minute 17 = the first start of the series.
+    - cron: "17 22 * * *"   # Murugan        03:47 IST   (public 18:30 IST that day)
+    - cron: "47 0 * * *"    # Murugan        06:17 IST
+    - cron: "47 3 * * *"    # Murugan        09:17 IST
+    - cron: "17 9 * * *"    # Mahaperiyava   14:47 IST   (public 06:30 IST the next morning)
+    - cron: "47 11 * * *"   # Mahaperiyava   17:17 IST
+    - cron: "47 14 * * *"   # Mahaperiyava   20:17 IST
   workflow_dispatch:
     inputs:
       series:
@@ -68,22 +70,33 @@ jobs:
           $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
           if ("${{ github.event_name }}" -eq "schedule") {
             $hour = [int]("${{ github.event.schedule }}".Split(" ")[1])
-            $series = if ($hour -lt 12) { "murugan" } else { "periyava" }
+            $series = if ($hour -ge 9 -and $hour -le 15) { "periyava" } else { "murugan" }
             $upload = "true"
           }
-          $day = [DateTime]::UtcNow.AddHours(5.5).ToString("yyyy-MM-dd")   # the date in India
+          # Which day's Short this is, in India time -- by what the start was MEANT for, not by the
+          # clock when GitHub finally ran it. A Mahaperiyava start belongs to its evening even if it
+          # runs after midnight (2026-10-05: a start fired at 00:17 was taken for the next day and
+          # made a second video for the same morning).
+          $now = [DateTime]::UtcNow.AddHours(5.5)
+          $late = $false
+          if ($series -eq "periyava") {
+            if ($now.Hour -lt 6) { $now = $now.AddDays(-1) }                 # after midnight: still yesterday evening's
+            elseif ($now.Hour -lt 12 -and "${{ github.event_name }}" -eq "schedule") { $late = $true }   # past 06:00: its 06:30 slot is gone
+          } elseif ($now.Hour -ge 18 -and "${{ github.event_name }}" -eq "schedule") { $late = $true }   # Murugan after 18:00: its 18:30 slot is gone
+          $day = $now.ToString("yyyy-MM-dd")
           $folder = if ($series -eq "murugan") { "auto" } else { "periyava" }
           $history = ".cache/assets_repo/episodes/$folder/history.json"
           $done = $false
           if ($upload -eq "true" -and (Test-Path $history)) {
             $done = [bool](Get-Content $history -Raw -Encoding utf8 | ConvertFrom-Json | Where-Object { $_.date -eq $day -and $_.video_id })
           }
-          # The first start of the day insists on the talking face (a failure is retried by the
-          # second start); the second start posts with a still picture rather than not at all.
-          # (GitHub sometimes starts a scheduled run late or not at all, hence the extra starts.)
-          $strict = if ("${{ github.event.schedule }}" -match "^47 ") { "0" } else { "1" }
+          # Scheduled runs never post a Short whose face doesn't talk: if the talking face can't be
+          # made the run fails (GitHub emails you) and the next start tries again.
+          $strict = if ("${{ github.event_name }}" -eq "schedule" -or $upload -eq "true") { "1" } else { "0" }
+          if ($late) { $done = $true }
           "series=$series", "upload=$upload", "day=$day", "strict=$strict", "todo=$(if ($done) { 'no' } else { 'yes' })" | Add-Content $env:GITHUB_OUTPUT
-          if ($done) { Write-Host "::notice title=$series::Already uploaded for $day -- nothing to do" }
+          if ($late) { Write-Host "::warning title=$series::This start ran too late for today's publish time -- skipped (the next day's starts carry on as usual)" }
+          elseif ($done) { Write-Host "::notice title=$series::Already uploaded for $day -- nothing to do" }
           else { Write-Host "::notice title=$series::Making the Short for $day (upload: $upload)" }
 
       - uses: actions/setup-python@v5
