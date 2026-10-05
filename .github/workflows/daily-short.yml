@@ -4,7 +4,7 @@ name: Make a Short
 # autopilot as the .bat files.
 #
 #   Murugan       starts 03:47, 06:17, 09:17 IST   -> public 18:30 IST the same day
-#   Mahaperiyava  starts 14:47, 17:17, 20:17 IST   -> public 06:30 IST the next morning
+#   Mahaperiyava  starts 14:47, 17:17, 20:17, 00:17 IST   -> public 06:30 IST the next morning
 # The first start that succeeds makes and uploads the Short; later starts see it is done and stop
 # in seconds. They exist because GitHub runs schedules late (often by hours) or skips one.
 # It can also be started by hand: Actions tab > Make a Short > Run workflow.
@@ -23,6 +23,7 @@ on:
     - cron: "17 9 * * *"    # Mahaperiyava   14:47 IST   (public 06:30 IST the next morning)
     - cron: "47 11 * * *"   # Mahaperiyava   17:17 IST
     - cron: "47 14 * * *"   # Mahaperiyava   20:17 IST
+    - cron: "47 18 * * *"   # Mahaperiyava   00:17 IST, last chance (still counts as that evening's)
   workflow_dispatch:
     inputs:
       series:
@@ -70,7 +71,7 @@ jobs:
           $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
           if ("${{ github.event_name }}" -eq "schedule") {
             $hour = [int]("${{ github.event.schedule }}".Split(" ")[1])
-            $series = if ($hour -ge 9 -and $hour -le 15) { "periyava" } else { "murugan" }
+            $series = if ($hour -in 22, 0, 3) { "murugan" } else { "periyava" }
             $upload = "true"
           }
           # Which day's Short this is, in India time -- by what the start was MEANT for, not by the
@@ -80,8 +81,8 @@ jobs:
           $now = [DateTime]::UtcNow.AddHours(5.5)
           $late = $false
           if ($series -eq "periyava") {
-            if ($now.Hour -lt 6) { $now = $now.AddDays(-1) }                 # after midnight: still yesterday evening's
-            elseif ($now.Hour -lt 12 -and "${{ github.event_name }}" -eq "schedule") { $late = $true }   # past 06:00: its 06:30 slot is gone
+            if ($now.Hour -lt 5) { $now = $now.AddDays(-1) }                 # after midnight: still yesterday evening's
+            elseif ($now.Hour -lt 12 -and "${{ github.event_name }}" -eq "schedule") { $late = $true }   # past 05:00: too late to be ready for 06:30
           } elseif ($now.Hour -ge 18 -and "${{ github.event_name }}" -eq "schedule") { $late = $true }   # Murugan after 18:00: its 18:30 slot is gone
           $day = $now.ToString("yyyy-MM-dd")
           $folder = if ($series -eq "murugan") { "auto" } else { "periyava" }
