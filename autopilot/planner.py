@@ -137,11 +137,45 @@ def _chapter_plan(day: date, settings: dict, history: History, judge) -> Plan:
     # ...and a different subject from the last days: each part opens with several talks on the same
     # deity, and consecutive Shorts on one subject feel like repeats even when the chapters differ.
     recent = _subject_stems(history.recent_titles(7))
-    fresh = [c for c in in_part if not _subject_stems([c.title]) & recent] or in_part
+    subjects = _Subjects(chapters)
+    by_id = {c.id: c for c in chapters}
+    recent_ids = [r["source_id"] for r in history.runs[-12:] if r.get("source_id") in by_id][-7:]
+    recent_subjects = set().union(*(subjects.of(by_id[i]) for i in recent_ids)) if recent_ids else set()
+    fresh = [c for c in in_part
+             if not _subject_stems([c.title]) & recent and not subjects.of(c) & recent_subjects] or in_part
     chapter = random.Random(day.toordinal()).choice(fresh)          # same day -> same pick if re-run
     v = verdicts[chapter.id]
     return Plan(day, v["theme"], source={"id": chapter.id, "credit": chapter.credit, "url": chapter.url,
                                          "title": chapter.title, "text": chapter.text[:12000]})
+
+
+class _Subjects:
+    """What each chapter is mainly about, read from its text: the few longer words it uses most
+    that are NOT common across the book (so 'பிள்ளையார்' counts, 'என்று' and 'இருக்கிறது' don't).
+    A chapter's title often doesn't name its subject ("உலகுக்கெல்லாம் சொந்தமானவர்" is about
+    Pillaiyar), so titles alone let the same subject through day after day."""
+
+    def __init__(self, chapters: list):
+        self.n = len(chapters)
+        self._stems = {c.id: self._count(c.text) for c in chapters}
+        self.spread: dict[str, int] = {}
+        for counts in self._stems.values():
+            for stem in counts:
+                self.spread[stem] = self.spread.get(stem, 0) + 1
+
+    @staticmethod
+    def _count(text: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for word in text.replace("‌", "").replace("‍", "").split():   # invisible joiners inside words
+            word = word.strip(" .,;:!?\"'()‘’“”-")
+            if len(word) >= 6 and "஀" <= word[0] <= "௿":
+                counts[word[:6]] = counts.get(word[:6], 0) + 1
+        return counts
+
+    def of(self, chapter) -> set[str]:
+        counts = self._stems.get(chapter.id) or self._count(chapter.text)
+        rare = {s: n for s, n in counts.items() if n >= 4 and self.spread.get(s, 0) < 0.08 * max(self.n, 1)}
+        return set(sorted(rare, key=lambda s: -rare[s])[:4])
 
 
 MIN_OPEN_CHAPTERS = 20   # keep at least this many judged, unused chapters to choose from
@@ -153,7 +187,7 @@ def _subject_stems(titles: list[str]) -> set[str]:
     'விநாயகரை' all give the same stem, so a subject is recognised in any of its forms."""
     stems = set()
     for title in titles:
-        for word in title.replace("|", " ").split():
+        for word in title.replace("|", " ").replace("‌", "").replace("‍", "").split():
             word = word.strip(" .,;:!?\"'()")
             if len(word) >= 6 and word not in _NOT_SUBJECTS and "஀" <= word[0] <= "௿":
                 stems.add(word[:6])

@@ -222,3 +222,23 @@ def test_blocked_title_words_are_never_chosen(tmp_path):
     settings = {"content": {"source": "deivathin_kural", "skip_title_words": skip}, "paths": {"source": store.folder}}
     h = planner.History(tmp_path / "h.json")
     assert {planner.plan_day(date(2026, 10, d), settings, h, None).source["title"] for d in range(1, 9)} == {"அன்பு"}
+
+
+def test_chapter_subject_is_read_from_the_text_not_only_the_title(tmp_path):
+    """"உலகுக்கெல்லாம் சொந்தமானவர்" doesn't name Pillaiyar in its title; its text does. After a
+    Pillaiyar chapter, it must not be the next day's choice (2026-10-05)."""
+    store = dk.Store(tmp_path / "dk")
+    store.folder.mkdir()
+    filler = "இது ஒரு பொதுவான வாக்கியம் என்று சொல்லலாம். "
+    texts = {"விநாயகர்": "பிள்ளையார் " * 12 + filler * 20,
+             "உலகுக்கெல்லாம் சொந்தமானவர்": "பிள்ளையாரை " * 9 + "பிள்ளை‌யாரின் " * 3 + filler * 20,
+             "குரு பக்தி": "குருவிடம் " * 12 + filler * 20}
+    rows = [{"part": 1, "index": i, "title": t, "url": f"{dk.BASE}c{i}.htm", "text": x} for i, (t, x) in enumerate(texts.items(), 1)]
+    rows += [{"part": 2, "index": i, "title": f"x{i}", "url": f"{dk.BASE}d{i}.htm", "text": filler * 30} for i in range(1, 40)]
+    store.path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    store.save_verdicts({f"1:c{i}.htm": {"theme": "t", "summary": "s", "suitable": True} for i in range(1, 4)})
+    settings = {"content": {"source": "deivathin_kural"}, "paths": {"source": store.folder}}
+    h = planner.History(tmp_path / "h.json")
+    h.add({"date": "2026-10-04", "source_id": "1:c1.htm", "theme": "t", "title": "மகா பெரியவா | எளிமை"})
+    for day in range(5, 12):
+        assert planner.plan_day(date(2026, 10, day), settings, h, None).source["title"] == "குரு பக்தி"
