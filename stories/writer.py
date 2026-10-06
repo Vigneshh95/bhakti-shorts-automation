@@ -21,12 +21,12 @@ def load_settings() -> dict:
     return s
 
 
-def _ask(settings: dict, system: str, user: str, schema: dict) -> dict:
+def ask(settings: dict, system: str, user: str, schema: dict, images: list | None = None) -> dict:
     backups = settings["models"].get("gemini_text_fallback") or []
     last = None
     for model in [settings["models"]["gemini_text"], *backups]:
         try:
-            return gemini.complete_json(model, system, user, schema)
+            return gemini.complete_json(model, system, user, schema, images=images)
         except (ProviderError, json.JSONDecodeError) as e:
             last = e
             log.warning("  %s unavailable: %s", model, str(e).splitlines()[0][:120])
@@ -42,10 +42,10 @@ def write(series: str, topic: str, settings: dict, recent_titles: list[str] | No
     feedback = ""
     for draft in range(1, MAX_DRAFTS + 1):
         log.info("  writing the story, draft %d", draft)
-        data = _ask(settings, system, user + feedback, S.SCHEMA)
+        data = ask(settings, system, user + feedback, S.SCHEMA)
         problems = S.validate(data, settings)
         if not problems:
-            review = _ask(settings, S.REVIEW.format(audience=audience), json.dumps(data, ensure_ascii=False, indent=1), S.REVIEW_SCHEMA)
+            review = ask(settings, S.REVIEW.format(audience=audience), json.dumps(data, ensure_ascii=False, indent=1), S.REVIEW_SCHEMA)
             if review.get("ok"):
                 data["series"], data["topic"] = series, topic
                 return data

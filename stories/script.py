@@ -17,8 +17,9 @@ CAST = {
     "narrator": {"name": "கதைசொல்லி", "voice": "narrator", "look": ""},
     "murugan": {"name": "குட்டி முருகன்", "voice": "murugan",
                 "look": "baby Lord Murugan, an adorable chubby toddler god with big bright kind eyes, curly dark hair, "
-                        "ornate golden crown, small red and white tilak, golden chest armour and jewellery, orange-red "
-                        "dhoti, holding a small golden Vel spear"},
+                        "ornate golden crown, three horizontal white stripes of sacred ash (vibhuti) across his "
+                        "forehead with one small round red kumkum dot in the middle (no vertical marks), golden chest "
+                        "armour and jewellery, orange-red dhoti, holding a small golden Vel spear"},
     "ilango": {"name": "இளங்கோ", "voice": "boy",
                "look": "Ilango, an 8-year-old Tamil boy with short neat black hair, round face, bright eyes, wearing a "
                        "blue half-sleeve shirt and khaki shorts"},
@@ -35,7 +36,15 @@ CAST = {
     "tale_woman": {"name": "", "voice": "tale_woman", "look": ""},
     "tale_man": {"name": "", "voice": "adult", "look": ""},
 }
-SPEAKERS = ["narrator", "murugan", "ilango", "kuzhali", "paatti", "person", "tale_child", "tale_woman", "tale_man"]
+# People inside Murugan's tale: up to four per episode, each listed in the script's tale_cast with
+# a kind, which gives them a fitting voice (two men in one tale still sound different: TALE_SHIFT).
+TALE_IDS = ["tale_1", "tale_2", "tale_3", "tale_4"]
+TALE_KINDS = {"boy": "tale_child", "girl": "girl", "woman": "tale_woman", "man": "adult",
+              "old_woman": "paatti", "old_man": "old_man"}
+TALE_SHIFT = {"tale_1": 0.0, "tale_2": 1.6, "tale_3": -1.6, "tale_4": 0.8}   # semitones
+for _id in TALE_IDS:
+    CAST[_id] = {"name": "", "voice": "", "look": ""}
+SPEAKERS = ["narrator", "murugan", "ilango", "kuzhali", "paatti", "person", *TALE_IDS]
 
 STYLE = ("Warm, glowing traditional South Indian storybook illustration, soft painterly finish, rich golden and green "
          "colours, gentle light, expressive friendly faces, wide 16:9 composition, no text, no letters, no watermark.")
@@ -48,6 +57,12 @@ SCHEMA = {
         "source_number": {"type": "integer"},
         "source_line_ta": {"type": "string"}, "source_name_ta": {"type": "string"}, "source_meaning_ta": {"type": "string"},
         "person_look": {"type": "string"},
+        "tale_cast": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"id": {"type": "string", "enum": TALE_IDS},
+                           "kind": {"type": "string", "enum": list(TALE_KINDS)},
+                           "name": {"type": "string"}, "look": {"type": "string"}},
+            "required": ["id", "kind", "name", "look"], "additionalProperties": False}},
         "scenes": {"type": "array", "items": {
             "type": "object",
             "properties": {
@@ -64,7 +79,7 @@ SCHEMA = {
         "hashtags": {"type": "array", "items": {"type": "string"}}, "tags": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["title_ta", "title_en", "lesson_ta", "source_number", "source_line_ta", "source_name_ta", "source_meaning_ta",
-                 "person_look", "scenes", "action_ta", "question_ta", "youtube_title", "youtube_description",
+                 "person_look", "tale_cast", "scenes", "action_ta", "question_ta", "youtube_title", "youtube_description",
                  "hashtags", "tags"],
     "additionalProperties": False,
 }
@@ -78,14 +93,21 @@ The episode is a list of scenes. Each scene is ONE picture with the lines spoken
 - picture: an English description of exactly what the painter should show: who is there, what they
   are doing, their expression, the place, the time of day. Do not describe the characters' fixed
   appearance (it is added automatically); name them: Murugan, Ilango, Kuzhali, Paatti, the peacock,
-  or "the person". One clear moment per picture; at most three characters in a picture.
+  or "the person". One clear moment per picture; at most three characters in a picture. Never ask
+  for writing, letters, a title card or a quotation in a picture (painters garble Tamil letters);
+  the captions show the words.
 - characters: who is visible in that picture.
-- lines: 2-4 spoken lines for that scene. speaker is who says it. Natural spoken Tamil that a
+- lines: 3-5 spoken lines for that scene. speaker is who says it. Natural spoken Tamil that a
   voice model will read aloud: Tamil script only (no English letters, no digits, no emoji, no
   quotation marks), each line at most {maxc} characters, ending with a full stop or question mark.
   The narrator tells the story; characters speak their own words. People inside the story that
-  Murugan tells speak as tale_child, tale_woman or tale_man (never as "person" in the children's
-  series), and their appearance is described in that scene's picture.
+  Murugan tells are listed ONCE each in tale_cast (at most four): id (tale_1 ... tale_4), kind (boy,
+  girl, woman, man, old_woman or old_man: it chooses their voice), an English name, and look: one
+  English sentence fixing their age, hair and clothes for the whole episode (e.g. "Somu, a
+  7-year-old Tamil village boy with curly hair, in a cream cotton shirt and white veshti"). Each
+  speaks with their own id as speaker, and only their own words: what the narrator says about them
+  is the narrator's line. In picture descriptions call them by name and do not re-describe them; in
+  characters list their id. Every person a line mentions as present must be in that picture.
 
 The lesson must rest on ONE line of Avvaiyar's Aathichoodi, chosen from the numbered list you are
 given: return its number (source_number) and copy the line exactly (source_line_ta). A line that
@@ -97,7 +119,7 @@ tale, do not present it as scripture.
 Also return: title_ta and title_en; lesson_ta (one sentence); source_line_ta (the exact line),
 source_name_ta (where it is from) and source_meaning_ta (its meaning in one simple sentence);
 action_ta (one small thing to do today); question_ta (one question to talk about);
-youtube_title (at most 80 characters, Tamil first then a short English part, honest, no hashtags);
+youtube_title (at most 90 characters, Tamil first then a short English part, honest, no hashtags);
 youtube_description (3-4 Tamil sentences then 1-2 English sentences, naming the lesson and source);
 hashtags (3-5); tags (10-20 search phrases, Tamil and English).
 Return only JSON matching the schema."""
@@ -113,8 +135,11 @@ Shape, {smin}-{smax} scenes in all:
 4. The child tries again and it goes better (2-3 scenes).
 5. What we learned: Paatti or Murugan says the source line; the narrator gives its meaning, the
    small thing to do today and the question (1-2 scenes).
+youtube_title must say in Tamil that it is a story for children, in this shape:
+"<the Aathichoodi line> | குழந்தைகளுக்கான குட்டி முருகன் கதை | Kids Moral Story".
 Very simple words and short sentences. Warm and a little funny. Nothing frightening, no violence,
-no punishment, nobody is shamed: the child is good and is learning. person_look: empty string.
+no punishment, nobody is shamed: the child is good and is learning. Kuzhali takes part in at least
+two scenes. person_look: empty string.
 Today's problem: {topic}."""
 
 ADULTS = COMMON + """
@@ -123,7 +148,10 @@ THIS SERIES: "முருகன் சொன்ன வழி", for viewers from
 One person today, with an ordinary Tamil name and life (a student, a young mother, a shopkeeper, a
 driver, a grandfather...), facing a problem of the world as it is now. Use speaker "person" for
 them, and give person_look: one English sentence describing their appearance, so every picture
-shows the same person.
+shows the same person. Start it with their name and exact age and say plainly that they are an
+adult, with features a painter cannot mistake for a child (e.g. "Karthik, a 24-year-old grown man,
+tall, with a short beard and moustache, ..."). Beside baby Murugan the person must still look
+their age: Murugan is the only child in those pictures.
 Shape, {smin}-{smax} scenes in all:
 1. A specific, true-to-life moment that shows the problem (2-3 scenes). Make the viewer think
    "that is me".
@@ -201,16 +229,32 @@ def validate(data: dict, settings: dict) -> list[str]:
         spoken = _plain(" ".join(l.get("text", "") for sc in scenes for l in sc.get("lines", [])))
         if quoted not in spoken:
             errors.append(f"the Aathichoodi line {real[n]!r} must be said, word for word, in the closing scene")
-    if not 10 <= len(data.get("youtube_title", "")) <= 90:
-        errors.append("youtube_title must be 10-90 characters")
+    if not 10 <= len(data.get("youtube_title", "")) <= 100:
+        errors.append("youtube_title must be 10-100 characters")
+    ids = {t.get("id") for t in data.get("tale_cast", [])}
+    used = {l.get("speaker") for sc in scenes for l in sc.get("lines", []) if str(l.get("speaker", "")).startswith("tale_")}
+    if used - ids:
+        errors.append(f"speakers {sorted(used - ids)} are not listed in tale_cast")
     return errors
 
 
-def picture_prompt(scene: dict, person_look: str = "") -> str:
+def voice_for(speaker: str, tale_cast: list[dict] | None, voices: dict) -> dict:
+    """The voice settings for a speaker: the cast's own, or for a person in the tale the voice of
+    their kind, shifted a little by their id so two of a kind differ."""
+    tale = {t.get("id"): t for t in tale_cast or []}
+    if speaker in tale:
+        style = dict(voices[TALE_KINDS.get(tale[speaker].get("kind"), "adult")])
+        style["semitones"] = style["semitones"] + TALE_SHIFT.get(speaker, 0.0)
+        return style
+    return voices[CAST.get(speaker, {}).get("voice") or "narrator"]
+
+
+def picture_prompt(scene: dict, person_look: str = "", tale_cast: list[dict] | None = None) -> str:
     """The full prompt for one scene: the moment, each visible character's fixed look, the style."""
+    tale = {t.get("id") or t.get("role"): t["look"] for t in tale_cast or []}
     looks = []
     for who in scene.get("characters", []):
-        look = person_look if who == "person" else CAST.get(who, {}).get("look", "")
+        look = person_look if who == "person" else tale.get(who) or CAST.get(who, {}).get("look", "")
         if look:
             looks.append(look)
     cast = " Characters: " + "; ".join(looks) + "." if looks else ""

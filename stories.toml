@@ -13,8 +13,8 @@ output = "Final/stories"
 
 [content]
 channel_name = "BrahmaNadagam"
-scenes_min = 12
-scenes_max = 16
+scenes_min = 16                      # about 5-6 minutes
+scenes_max = 20
 max_line_chars = 70
 
 # Problems to tell stories about, in turn (add your own lines).
@@ -53,14 +53,20 @@ pace = 0.92
 speaker = "female"
 semitones = 4.0
 pace = 0.86
+# Children: a smaller pitch change with the voice's "size" moved along with it (formant = shifted)
+# is clearer than a big change with the size kept, which sounded muffled.
 [voices.boy]
 speaker = "male"
-semitones = 6.0
-pace = 0.95
+semitones = 4.0
+pace = 0.97
+formant = "shifted"
+clarity_db = 3.5
 [voices.girl]
 speaker = "female"
-semitones = 5.5
-pace = 0.97
+semitones = 3.5
+pace = 0.98
+formant = "shifted"
+clarity_db = 3.0
 [voices.paatti]
 speaker = "female"
 semitones = -2.5
@@ -71,9 +77,24 @@ semitones = 0.0
 pace = 0.92
 [voices.tale_child]
 speaker = "male"
-semitones = 7.5
+semitones = 5.0
 pace = 1.0
+formant = "shifted"
+clarity_db = 3.5
 [voices.tale_woman]
 speaker = "female"
 semitones = 1.0
 pace = 0.95
+[voices.old_man]
+speaker = "male"
+semitones = -2.5
+pace = 0.86
+
+# YouTube, per series. "made_for_kids" is a legal declaration: yes for the children's series
+# (YouTube then turns off comments and personalised ads on those videos), no for the adults series.
+[youtube.kids]
+made_for_kids = true
+playlist_id = "PLF70-DN_o7Uc"         # குழந்தைகளுக்கான குட்டி முருகன் கதைகள் | Kutti Murugan Stories for Kids
+[youtube.adults]
+made_for_kids = false
+playlist_id = ""

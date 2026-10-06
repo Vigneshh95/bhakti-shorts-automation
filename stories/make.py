@@ -53,12 +53,15 @@ VIDEO = {
 }
 
 
-def paint(script: dict, folder: Path, work: Path, timeout_min: int = 240) -> list[Path]:
-    """One picture per scene in <folder>/pictures (scene_01.png ...); only missing ones are painted."""
+def paint(script: dict, folder: Path, work: Path, timeout_min: int = 240, attempt: int = 0) -> list[Path]:
+    """One picture per scene in <folder>/pictures (scene_01.png ...); only missing ones are painted.
+    A scene that failed the check carries a "fix" note, which is added to its prompt."""
     pictures = folder / "pictures"
     pictures.mkdir(parents=True, exist_ok=True)
     paths = [pictures / f"scene_{i:02d}.png" for i in range(1, len(script["scenes"]) + 1)]
-    jobs = [{"name": p.stem, "prompt": S.picture_prompt(sc, script.get("person_look", "")), "seed": 4000 + i}
+    jobs = [{"name": p.stem, "seed": 4000 + i + 1000 * attempt,
+             "prompt": S.picture_prompt(sc, script.get("person_look", ""), script.get("tale_cast"))
+             + (f" Important: {sc['fix']}" if sc.get("fix") else "")}
             for i, (p, sc) in enumerate(zip(paths, script["scenes"])) if not p.exists()]
     if not jobs:
         return paths
@@ -81,6 +84,58 @@ def paint(script: dict, folder: Path, work: Path, timeout_min: int = 240) -> lis
     return paths
 
 
+CHECK_SYSTEM = """You check illustrations for a Tamil children's story video against what each was
+meant to show. For every image (by its label) return ok and, if not ok, issue (what is wrong) and
+fix (one short instruction to the painter that would prevent it).
+ok=false ONLY for clear faults that a viewer would notice:
+- a person who must be there is missing, or an extra main person or a second peacock appears;
+- a person's age is clearly wrong (a grown man or woman drawn as a child, or the reverse);
+- what is happening contradicts the description (e.g. looking at the phone when it should be put down);
+- visible writing, letters or a caption in the picture;
+- badly deformed faces or hands;
+- baby Murugan's forehead shows a vertical or U-shaped mark where three HORIZONTAL white ash
+  stripes with a red dot were asked for.
+Small differences in background, pose or colour are fine: ok=true."""
+
+CHECK_SCHEMA = {"type": "object", "properties": {"images": {"type": "array", "items": {
+    "type": "object",
+    "properties": {"label": {"type": "string"}, "ok": {"type": "boolean"}, "issue": {"type": "string"},
+                   "fix": {"type": "string"}},
+    "required": ["label", "ok", "issue", "fix"], "additionalProperties": False}}},
+    "required": ["images"], "additionalProperties": False}
+
+
+def check_pictures(script: dict, paths: list[Path], settings: dict, batch: int = 6) -> dict[int, dict]:
+    """Scene number -> {"issue", "fix"} for pictures that don't show what they should. Uses Gemini's
+    vision (free tier). If it can't be reached the pictures are used as painted."""
+    import io
+
+    from stories import writer
+
+    bad: dict[int, dict] = {}
+    for start in range(0, len(paths), batch):
+        images, notes = [], []
+        for i in range(start, min(start + batch, len(paths))):
+            with Image.open(paths[i]) as im:
+                im = im.convert("RGB")
+                im.thumbnail((896, 512))
+                buf = io.BytesIO()
+                im.save(buf, "JPEG", quality=82)
+            label = paths[i].stem
+            images.append((label, buf.getvalue()))
+            scene = script["scenes"][i]
+            notes.append(f"{label}: {S.picture_prompt(scene, script.get('person_look', ''), script.get('tale_cast'))}")
+        try:
+            result = writer.ask(settings, CHECK_SYSTEM, "Meant to show:\n" + "\n".join(notes), CHECK_SCHEMA, images)
+        except RuntimeError as e:
+            log.warning("  the pictures couldn't be checked (%s); using them as painted", str(e)[:100])
+            return bad
+        for r in result.get("images", []):
+            if not r.get("ok") and r.get("label", "").startswith("scene_"):
+                bad[int(r["label"].split("_")[1])] = {"issue": r.get("issue", ""), "fix": r.get("fix", "")}
+    return bad
+
+
 def _shape(line: LineAudio, style: dict, ffmpeg: Path, cache: Cache) -> LineAudio:
     """The spoken line in its character's voice: pitch and pace changed, word timings kept in step."""
     pitch, pace = 2 ** (style["semitones"] / 12), style["pace"]
@@ -90,7 +145,8 @@ def _shape(line: LineAudio, style: dict, ffmpeg: Path, cache: Cache) -> LineAudi
     if not hit:
         tmp = out.with_suffix(".tmp.wav")
         subprocess.run([str(ffmpeg), "-y", "-loglevel", "error", "-i", str(line.wav_path), "-af",
-                        f"rubberband=pitch={pitch:.5f}:tempo={pace:.5f}:formant=preserved:pitchq=quality",
+                        f"rubberband=pitch={pitch:.5f}:tempo={pace:.5f}:formant={style.get('formant', 'preserved')}"
+                        f":pitchq=quality,highpass=f=80,equalizer=f=3400:t=q:w=1.0:g={style.get('clarity_db', 2.0)}",
                         str(tmp)], check=True)
         tmp.replace(out)
     duration = sf.info(out).duration
@@ -110,6 +166,21 @@ def make(folder: Path, settings: dict) -> Path:
     ff = cfg["paths"]["ffmpeg"]
 
     pictures = paint(script, folder, work)
+    for attempt in (1, 2):   # look at every picture; repaint the ones that don't show their scene
+        marker = folder / "pictures" / f".checked_{attempt}"
+        if marker.exists():
+            continue
+        bad = check_pictures(script, pictures, settings)
+        marker.write_text(json.dumps(bad, ensure_ascii=False, indent=1), encoding="utf-8")
+        if not bad:
+            log.info("  all %d pictures show their scenes", len(pictures))
+            break
+        for n, why in bad.items():
+            log.info("  scene %d repainted: %s", n, why["issue"][:110])
+            script["scenes"][n - 1]["fix"] = why["fix"]
+            pictures[n - 1].unlink(missing_ok=True)
+        (folder / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
+        pictures = paint(script, folder, work, attempt=attempt)
     for p in pictures:   # a tall or square picture would be cropped to a strip: refuse it
         with Image.open(p) as im:
             if im.width < im.height * 1.6:
@@ -120,7 +191,7 @@ def make(folder: Path, settings: dict) -> Path:
     spoken, scene_of = [], []
     for i, scene in enumerate(script["scenes"]):
         for line in scene["lines"]:
-            style = settings["voices"][S.CAST[line["speaker"]]["voice"]]
+            style = S.voice_for(line["speaker"], script.get("tale_cast"), settings["voices"])
             raw = tts.synthesize_lines([line["text"]], style["speaker"], voice, cache)[0]
             spoken.append(_shape(raw, style, ff, cache))
             scene_of.append(i)

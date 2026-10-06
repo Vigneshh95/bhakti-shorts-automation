@@ -92,7 +92,8 @@ def looks_ok(image):
 # Try each model on the first picture; the first that paints a real picture does them all.
 folder = "/tmp/pictures"
 os.makedirs(folder, exist_ok=True)
-loaders = [lambda: load_z_image(torch.float16), lambda: load_z_image(torch.bfloat16), load_sdxl]
+# bfloat16 first: float16 paints blank pictures on the T4 (seen every run), and trying it cost 5 minutes.
+loaders = [lambda: load_z_image(torch.bfloat16), load_sdxl]
 model = paint = None
 first = JOBS[0]
 for loader in loaders:
