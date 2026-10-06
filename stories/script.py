@@ -17,8 +17,9 @@ CAST = {
     "narrator": {"name": "கதைசொல்லி", "voice": "narrator", "look": ""},
     "murugan": {"name": "குட்டி முருகன்", "voice": "murugan",
                 "look": "baby Lord Murugan, an adorable chubby toddler god with big bright kind eyes, curly dark hair, "
-                        "ornate golden crown, three horizontal white stripes of sacred ash (vibhuti) across his "
-                        "forehead with one small round red kumkum dot in the middle (no vertical marks), golden chest "
+                        "ornate golden crown, forehead marked only with three horizontal white lines of sacred ash "
+                        "(Shaiva tripundra) and one small round red dot at their centre, with no vertical line and no "
+                        "U-shaped mark, golden chest "
                         "armour and jewellery, orange-red dhoti, holding a small golden Vel spear"},
     "ilango": {"name": "இளங்கோ", "voice": "boy",
                "look": "Ilango, an 8-year-old Tamil boy with short neat black hair, round face, bright eyes, wearing a "
@@ -46,8 +47,11 @@ for _id in TALE_IDS:
     CAST[_id] = {"name": "", "voice": "", "look": ""}
 SPEAKERS = ["narrator", "murugan", "ilango", "kuzhali", "paatti", "person", *TALE_IDS]
 
-STYLE = ("Warm, glowing traditional South Indian storybook illustration, soft painterly finish, rich golden and green "
-         "colours, gentle light, expressive friendly faces, wide 16:9 composition, no text, no letters, no watermark.")
+STYLE = ("Warm, glowing South Indian storybook illustration in ONE consistent soft stylised animation style for "
+         "everyone in the picture: adults are drawn in the same style as the children but with clearly adult faces, "
+         "height and proportions (never photorealistic, never child-like). Soft painterly finish, rich golden and "
+         "green colours, gentle light, expressive friendly faces, wide 16:9 composition. Each person appears once. "
+         "Any peacock is an ordinary bird. No text, no letters, no writing, no watermark.")
 
 SCHEMA = {
     "type": "object",
@@ -151,7 +155,12 @@ them, and give person_look: one English sentence describing their appearance, so
 shows the same person. Start it with their name and exact age and say plainly that they are an
 adult, with features a painter cannot mistake for a child (e.g. "Karthik, a 24-year-old grown man,
 tall, with a short beard and moustache, ..."). Beside baby Murugan the person must still look
-their age: Murugan is the only child in those pictures.
+their age: Murugan is the only child in those pictures. person_look holds ONLY what never
+changes (age, build, hair, face, clothes): no objects in the hand, no mood, no pose.
+Anyone else who is in more than one picture (the person's child, wife, mother, a friend...) is also
+listed in tale_cast with an id, kind, name and fixed look, and that id is in the scene's characters,
+exactly like the people of Murugan's tale. The people of the tale and of the person's own life are
+different people with different names.
 Shape, {smin}-{smax} scenes in all:
 1. A specific, true-to-life moment that shows the problem (2-3 scenes). Make the viewer think
    "that is me".
@@ -174,6 +183,11 @@ Audience: {audience}."""
 REVIEW_SCHEMA = {"type": "object", "properties": {"ok": {"type": "boolean"}, "issues": {"type": "array", "items": {"type": "string"}}},
                  "required": ["ok", "issues"], "additionalProperties": False}
 
+# a picture description that asks for writing, and a fixed look that carries a prop / mood / pose
+_WRITING = re.compile(r"\b(written|writing|letters?|lettering|text|caption|title card|quote|quotation|inscri\w+|"
+                      r"calligraph\w+|displaying the|showing the (line|words|verse))\b", re.I)
+_PROP = re.compile(r"\b(holding|carrying|in (his|her) hand|phone|smartphone|laptop|looking|smiling|tired|sad|"
+                   r"worried|sitting|standing)\b", re.I)
 _TAMIL = re.compile(r"^[஀-௿\s.,;!?‌‍-]+$")
 
 
@@ -207,7 +221,16 @@ def validate(data: dict, settings: dict) -> list[str]:
     scenes = data.get("scenes", [])
     if not c["scenes_min"] <= len(scenes) <= c["scenes_max"] + 2:
         errors.append(f"need {c['scenes_min']}-{c['scenes_max']} scenes, got {len(scenes)}")
+    spoken_lines = sum(len(sc.get("lines", [])) for sc in scenes)
+    if scenes and spoken_lines < 2.8 * len(scenes):
+        errors.append(f"too short: {spoken_lines} lines in {len(scenes)} scenes; give every scene 3-5 lines")
+    if _PROP.search(data.get("person_look", "")):
+        errors.append("person_look must hold only permanent features (age, build, hair, face, clothes): "
+                      "remove objects in the hand, moods and poses")
     for i, sc in enumerate(scenes, 1):
+        if _WRITING.search(sc.get("picture", "")):
+            errors.append(f"scene {i}: a picture must not show writing, letters, a scroll or card with a line, "
+                          "or a title (the captions show the words): describe a scene without any text")
         if len(sc.get("picture", "")) < 30:
             errors.append(f"scene {i}: the picture description is too short")
         if not sc.get("lines"):
