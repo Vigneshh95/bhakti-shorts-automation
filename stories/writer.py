@@ -23,10 +23,15 @@ def load_settings() -> dict:
 
 def ask(settings: dict, system: str, user: str, schema: dict, images: list | None = None) -> dict:
     backups = settings["models"].get("gemini_text_fallback") or []
+    # Stories make many calls; with their own key (a second Google Cloud project) they don't use up
+    # the free daily allowance the daily Shorts depend on. Without one, the shared key is used.
+    from autopilot.settings import api_key
+
+    key_name = "GEMINI_API_KEY_STORIES" if api_key("GEMINI_API_KEY_STORIES") else "GEMINI_API_KEY"
     last = None
     for model in [settings["models"]["gemini_text"], *backups]:
         try:
-            return gemini.complete_json(model, system, user, schema, images=images)
+            return gemini.complete_json(model, system, user, schema, images=images, key_name=key_name)
         except (ProviderError, json.JSONDecodeError) as e:
             last = e
             log.warning("  %s unavailable: %s", model, str(e).splitlines()[0][:120])
