@@ -35,6 +35,11 @@ class Segment:
 def bake_image(src: Path, cfg: dict, effects: list[Effect], cache: Cache) -> np.ndarray:
     W, H = cfg["video"]["width"], cfg["video"]["height"]
     bake_cfg = {e.name: e.cfg for e in effects if e.has_bake}
+    # How much larger than the frame the picture is kept, i.e. how far the camera is zoomed in at
+    # rest. Shorts use 12%; wide story pictures are composed for the frame and use much less.
+    headroom = float(cfg["effects"]["kenburns"].get("headroom", HEADROOM))
+    if headroom != HEADROOM:
+        bake_cfg = {**bake_cfg, "_headroom": headroom}
     key = cache.key("bake", BAKE_VERSION, src, W, H, bake_cfg)
     path, hit = cache.lookup("bake", key, ".png")
     if hit:
@@ -44,7 +49,7 @@ def bake_image(src: Path, cfg: dict, effects: list[Effect], cache: Cache) -> np.
     if img is None:
         raise ValueError(f"Can't read image: {src}")
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    MW, MH = round(W * HEADROOM), round(H * HEADROOM)
+    MW, MH = round(W * headroom), round(H * headroom)
     scale = max(MW / img.shape[1], MH / img.shape[0])
     interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_LANCZOS4
     img = cv2.resize(img, (round(img.shape[1] * scale), round(img.shape[0] * scale)), interpolation=interp)

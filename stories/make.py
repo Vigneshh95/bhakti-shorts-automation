@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
+from PIL import Image
 
 from shorts.cache import Cache
 from shorts.config import ROOT, deep_merge, load_config
@@ -27,7 +28,9 @@ from shorts.stages.tts import LineAudio, Word
 from stories import script as S
 
 PICTURE_RUNNER = ROOT / "shorts" / "vendor" / "kaggle_pictures.py"
-PICTURE_SIZE = (1344, 768)   # 16:9, multiples of 16; the renderer scales it to 1920x1080
+# Long videos are widescreen: every picture is painted 16:9 FOR the story (multiples of 16; the
+# renderer scales it to 1920x1080). The tall 9:16 pictures of the Shorts folders are never used here.
+PICTURE_SIZE = (1344, 768)
 
 # What a story video changes in the Shorts engine's settings (config.toml stays as it is).
 VIDEO = {
@@ -37,7 +40,9 @@ VIDEO = {
                                    "eq_gain_db": 0.0, "compress": True}}},
     "audio": {"bgm_db": -21.0, "duck_ratio": 3},
     "captions": {"size": 58, "words_per_caption": 6, "position_y": 0.87, "outline": 4},
-    "effects": {"kenburns": {"zoom": 0.07, "pan": 0.04, "loop": False},
+    # The pictures are painted wide for the story, so nearly all of each is shown: a small margin
+    # (3%) and a gentle 4% zoom, where Shorts crop 12% and zoom 8%.
+    "effects": {"kenburns": {"zoom": 0.04, "pan": 0.02, "loop": False, "headroom": 1.03},
                 "particles": {"count": 30, "opacity": 0.5},
                 "glow_pulse": {"enabled": False},
                 "watermark": {"lines": ["BrahmaNadagam"], "position_y": 0.06, "opacity": 0.45},
@@ -105,6 +110,10 @@ def make(folder: Path, settings: dict) -> Path:
     ff = cfg["paths"]["ffmpeg"]
 
     pictures = paint(script, folder, work)
+    for p in pictures:   # a tall or square picture would be cropped to a strip: refuse it
+        with Image.open(p) as im:
+            if im.width < im.height * 1.6:
+                raise RuntimeError(f"{p.name} is {im.width}x{im.height}: story pictures must be wide (16:9)")
 
     # voices: every line by its speaker's voice; remember which scene each line belongs to
     voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))
@@ -134,7 +143,7 @@ def make(folder: Path, settings: dict) -> Path:
     for i, image in enumerate(images):
         zoom_in = i % 2 == 0
         z0, z1 = (1.0, 1.0 + kb["zoom"]) if zoom_in else (1.0 + kb["zoom"], 1.0)
-        direction = rng.uniform(-1, 1, 2) * (kb["pan"] / (visuals.HEADROOM - 1))
+        direction = rng.uniform(-1, 1, 2) * (kb["pan"] / max(kb.get("headroom", visuals.HEADROOM) - 1, 1e-6))
         segments.append(visuals.Segment(image, bounds[i], bounds[i + 1], z0, z1, (float(direction[0]), float(direction[1]))))
 
     out = settings["paths"]["output"] / f"{folder.name}.mp4"

@@ -39,6 +39,12 @@ res = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-U", "diffu
 if res.returncode != 0:
     log(res.stderr[-2000:])
     raise SystemExit("pip install failed")
+# torchao is an optional extra that newer diffusers imports if present; the image's copy is too old
+# for it ("cannot import name 'FqnToConfig'", 2026-10-06). We quantise with bitsandbytes, not torchao.
+subprocess.run([sys.executable, "-m", "pip", "uninstall", "-q", "-y", "torchao"], capture_output=True, text=True)
+vers = subprocess.run([sys.executable, "-m", "pip", "list", "--format=freeze"], capture_output=True, text=True).stdout
+log("versions:", ", ".join(l for l in vers.splitlines() if l.split("==")[0].lower() in
+                            ("diffusers", "transformers", "accelerate", "bitsandbytes", "torch")))
 log("packages ready")
 
 import numpy as np  # noqa: E402
