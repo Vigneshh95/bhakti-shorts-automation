@@ -1,0 +1,79 @@
+# Story episodes: baby Murugan as a friend and guide, as an illustrated story (16:9, 5-8 minutes).
+#   kids    "குட்டி முருகன் கதைகள்"   children of 4-10 with a parent   (YouTube: made for kids = yes)
+#   adults  "முருகன் சொன்ன வழி"       viewers of 15 and up              (made for kids = no)
+# The cast, the prompts and the picture style are in stories/script.py.
+
+[models]
+gemini_text = "gemini-3.8-flash"
+gemini_text_fallback = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+
+[paths]
+episodes = "story_episodes"          # one folder per episode: script.json, pictures, the video
+output = "Final/stories"
+
+[content]
+channel_name = "BrahmaNadagam"
+scenes_min = 12
+scenes_max = 16
+max_line_chars = 70
+
+# Problems to tell stories about, in turn (add your own lines).
+[topics]
+kids = [
+  "telling a lie to escape a scolding",
+  "not wanting to share toys or food with a sibling",
+  "being afraid of the dark",
+  "getting very angry and breaking something",
+  "feeling jealous when a brother or sister is praised",
+  "giving up as soon as something is hard",
+  "wasting food on the plate",
+  "teasing another child who is different",
+  "not listening to grandmother and elders",
+  "wanting everything the other children have",
+]
+adults = [
+  "comparing your life with what others show on their phones",
+  "exam and job pressure on a student who fears disappointing the family",
+  "a parent too busy with work and the phone to listen to their child",
+  "anger that hurts the people at home",
+  "worry about money and debt that takes away sleep",
+  "loneliness of an elder whose children live far away",
+  "fear of failing again after one failure",
+  "a quarrel between brothers over family property",
+  "caring for an ageing parent while feeling exhausted",
+  "grief after losing someone dear",
+]
+
+# Voices: the laptop's Tamil voice (IndicTTS), shaped per character.
+[voices.narrator]
+speaker = "female"
+semitones = 0.0
+pace = 0.92
+[voices.murugan]
+speaker = "female"
+semitones = 4.0
+pace = 0.86
+[voices.boy]
+speaker = "male"
+semitones = 6.0
+pace = 0.95
+[voices.girl]
+speaker = "female"
+semitones = 5.5
+pace = 0.97
+[voices.paatti]
+speaker = "female"
+semitones = -2.5
+pace = 0.84
+[voices.adult]
+speaker = "male"
+semitones = 0.0
+pace = 0.92
+[voices.tale_child]
+speaker = "male"
+semitones = 7.5
+pace = 1.0
+[voices.tale_woman]
+speaker = "female"
+semitones = 1.0
+pace = 0.95
