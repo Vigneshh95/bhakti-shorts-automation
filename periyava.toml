@@ -1,6 +1,6 @@
 # Sri Mahaperiyava series: every day the essence of one Deivathin Kural chapter, retold in simple
 # Tamil in a voice modelled on your sample, over his photo (lip-sync on Kaggle), scheduled on YouTube.
-# Run: periyava_short.bat (make + upload) or periyava_preview.bat (make only). See PERIYAVA_PLAN.md.
+# Run: periyava_short.bat (make + upload) or periyava_preview.bat (make only). See docs/PERIYAVA_PLAN.md.
 # Same autopilot as the Murugan series (autopilot.toml); only what's listed here differs.
 
 [series]

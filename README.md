@@ -246,7 +246,7 @@ Add each year's festival dates under `[[festivals]]` in `autopilot.toml`. The AI
 
 ## Sri Mahaperiyava series (periyava.toml)
 
-Each day's Short retells the essence of one *Deivathin Kural* chapter in simple spoken Tamil. The voice is modelled on your sample, his lips move with the words, and the video is scheduled for 06:30 IST in its own playlist on the same channel. It runs on the same autopilot as Murugan; only `periyava.toml` differs, and the Murugan series is untouched. The design is in `PERIYAVA_PLAN.md`.
+Each day's Short retells the essence of one *Deivathin Kural* chapter in simple spoken Tamil. The voice is modelled on your sample, his lips move with the words, and the video is scheduled for 06:30 IST in its own playlist on the same channel. It runs on the same autopilot as Murugan; only `periyava.toml` differs, and the Murugan series is untouched. The design is in `docs/PERIYAVA_PLAN.md`.
 
 | Action | How |
 |---|---|
