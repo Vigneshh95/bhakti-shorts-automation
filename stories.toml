@@ -16,6 +16,8 @@ channel_name = "BrahmaNadagam"
 scenes_min = 16                      # about 5-6 minutes
 scenes_max = 20
 max_line_chars = 70
+adults_scenes = [18, 22]              # the grown-ups' stories run longer: about 6-8 minutes
+releases_per_week = 2                 # per series (schedule to be set with the cloud runs)
 
 # Problems to tell stories about, in turn (add your own lines).
 [topics]

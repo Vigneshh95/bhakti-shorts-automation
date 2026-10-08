@@ -157,6 +157,15 @@ def _shape(line: LineAudio, style: dict, ffmpeg: Path, cache: Cache) -> LineAudi
     return LineAudio(line.text, out, line.sample_rate, duration, words)
 
 
+def _pad(line: LineAudio, seconds: float, cache: Cache) -> LineAudio:
+    """The same line followed by `seconds` of silence (so the pause before the next line is longer)."""
+    out, hit = cache.lookup("story_pause", cache.key("story_pause", line.wav_path, round(seconds, 2)), ".wav")
+    if not hit:
+        wav, sr = sf.read(line.wav_path, dtype="float32")
+        sf.write(out, np.concatenate([wav, np.zeros(int(seconds * sr), np.float32)]), sr, subtype="PCM_16")
+    return LineAudio(line.text, out, line.sample_rate, line.duration + seconds, line.words)
+
+
 def make(folder: Path, settings: dict) -> Path:
     script = json.loads((folder / "script.json").read_text(encoding="utf-8"))
     cfg = deep_merge(load_config(), VIDEO)
@@ -191,13 +200,28 @@ def make(folder: Path, settings: dict) -> Path:
 
     # voices: every line by its speaker's voice; remember which scene each line belongs to
     voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))
-    spoken, scene_of = [], []
+    spoken, scene_of, speakers = [], [], []
     for i, scene in enumerate(script["scenes"]):
         for line in scene["lines"]:
             style = S.voice_for(line["speaker"], script.get("tale_cast"), settings["voices"])
             raw = tts.synthesize_lines([line["text"]], style["speaker"], voice, cache)[0]
             spoken.append(_shape(raw, style, ff, cache))
             scene_of.append(i)
+            speakers.append(line["speaker"])
+    # Pauses that follow the sense, on top of the even gap between lines: a beat after a question,
+    # a breath when someone else answers, a longer rest when the picture changes.
+    for k in range(len(spoken) - 1):
+        extra = 0.0
+        if spoken[k].text.rstrip().endswith("?"):
+            extra += 0.35
+        if spoken[k].text.rstrip().endswith(("...", "…")):
+            extra += 0.30
+        if speakers[k + 1] != speakers[k]:
+            extra += 0.15
+        if scene_of[k + 1] != scene_of[k]:
+            extra += 0.55
+        if extra:
+            spoken[k] = _pad(spoken[k], extra, cache)
     del voice
     aud = audio.make_audio(spoken, cfg, work)
     log.info("  %.0f s of story, %d lines, %d scenes", aud.duration, len(spoken), len(pictures))

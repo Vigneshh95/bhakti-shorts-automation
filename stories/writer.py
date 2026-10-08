@@ -43,11 +43,15 @@ def write(series: str, topic: str, settings: dict, recent_titles: list[str] | No
     user = "Write today's episode.\n\n" + S.source_list()
     if recent_titles:
         user += "\nEarlier episodes (tell a different story with a different source line):\n- " + "\n- ".join(recent_titles[-12:])
-    audience = "children of 4-10 with a parent" if series == "kids" else "viewers from 15 to 80"
+    audience = ("children of 4-10 with a parent" if series == "kids" else
+                "viewers from 15 to 80. For them also reject a script that lectures, states its moral before the "
+                "closing scene or more than once, solves the problem with one sentence of advice, has people speak in "
+                "stiff written Tamil instead of the way people talk at home, or reads like a story for small children")
     feedback = ""
     for draft in range(1, MAX_DRAFTS + 1):
         log.info("  writing the story, draft %d", draft)
         data = ask(settings, system, user + feedback, S.SCHEMA)
+        data["series"] = series
         problems = S.validate(data, settings)
         if not problems:
             review = ask(settings, S.REVIEW.format(audience=audience), json.dumps(data, ensure_ascii=False, indent=1), S.REVIEW_SCHEMA)

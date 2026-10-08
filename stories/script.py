@@ -164,15 +164,38 @@ Anyone else who is in more than one picture (the person's child, wife, mother, a
 listed in tale_cast with an id, kind, name and fixed look, and that id is in the scene's characters,
 exactly like the people of Murugan's tale. The people of the tale and of the person's own life are
 different people with different names.
+This is a story for grown-ups, not a lesson with a story attached. Hold a viewer of 20 or of 70:
+- Open in the middle of a moment with something at stake: a phone call that changes the day, a
+  sentence said in anger, a result on a screen. No introductions.
+- The person is intelligent and partly right. Their difficulty is real (money, time, pride, hurt,
+  tiredness) and is never solved by one sentence of advice. Let them push back at Murugan,
+  doubt him, even laugh at being advised by a child.
+- Murugan is playful and sharp, never a preacher. He mostly asks questions, notices small things,
+  teases gently, and lets the person find the answer. He never says "you should".
+- The tale he tells has its own tension and a turn the viewer does not see coming; its people
+  want things and make mistakes. Prefer a real incident from Tamil tradition (Avvaiyar, Murugan's
+  own stories, Nakkeerar, Arunagirinathar, a king and a poet) told with fresh detail; if you
+  invent one, give it specific people, a place and a surprise. No rich-man-poor-man fable.
+- Show, don't tell: a look, a silence, an unanswered message says more than a sentence about
+  feelings. Include one moment of gentle humour and one of real quiet.
+- The ending changes one small thing and leaves the rest open. Life is not fixed in a day.
+- The meaning is spoken ONCE, at the end, through the Aathichoodi line. Nobody explains the
+  moral before that, and nobody repeats it after.
+How they talk: natural spoken Tamil (பேச்சுத் தமிழ்) for the person, their family and Murugan, the
+way people speak at home today; the narrator in simple clear Tamil, used sparingly (most scenes are
+carried by what people say and do). Let lines breathe: short sentences, a comma where a speaker
+pauses, three dots where a thought trails off, real questions that get real answers, and sometimes
+no answer at all.
 Shape, {smin}-{smax} scenes in all:
-1. A specific, true-to-life moment that shows the problem (2-3 scenes). Make the viewer think
-   "that is me".
-2. Baby Murugan appears, simple and unhurried, and listens (1-2 scenes).
-3. He answers with a short story from our tradition (5-7 scenes).
-4. The person sees it differently and takes one small, real step (2-3 scenes).
-5. The source line, its meaning, one practical thing to do today, one question to think about (1-2 scenes).
-Respectful and calm, never preachy. No medical, legal or financial advice; no blaming of any
-group; nothing about caste. Today's problem: {topic}."""
+1. The moment (3-4 scenes): the viewer thinks "that is me".
+2. Murugan turns up where nobody expects a god: on the bus seat, at the tea shop, on the office
+   stairs (2-3 scenes). The person is not sure what to make of him.
+3. The tale, with its turn (6-8 scenes).
+4. Back to today: the person tries one small thing, and it is not easy (3-4 scenes).
+5. The Aathichoodi line and its meaning in one sentence; one thing to try today; one question to
+   carry (1-2 scenes).
+No medical, legal or financial advice; no blaming of any group; nothing about caste.
+Today's problem: {topic}."""
 
 REVIEW = """You are a careful Tamil editor and a parent. Check this story episode and return
 ok=false with specific issues if ANY of these hold: incorrect or unnatural Tamil; anything
@@ -191,7 +214,7 @@ _WRITING = re.compile(r"\b(written|writing|letters?|lettering|text|caption|title
                       r"calligraph\w+|displaying the|showing the (line|words|verse))\b", re.I)
 _PROP = re.compile(r"\b(holding|carrying|in (his|her) hand|phone|smartphone|laptop|looking|smiling|tired|sad|"
                    r"worried|sitting|standing)\b", re.I)
-_TAMIL = re.compile(r"^[஀-௿\s.,;!?‌‍-]+$")
+_TAMIL = re.compile(r"^[஀-௿\s.,;!?…‌‍-]+$")
 
 
 def aathichoodi() -> list[dict]:
@@ -214,16 +237,17 @@ def _plain(text: str) -> str:
 def system_prompt(series: str, settings: dict, topic: str) -> str:
     c = settings["content"]
     template = KIDS if series == "kids" else ADULTS
-    return template.format(channel=c["channel_name"], maxc=c["max_line_chars"], smin=c["scenes_min"],
-                           smax=c["scenes_max"], topic=topic)
+    smin, smax = c.get(f"{series}_scenes") or (c["scenes_min"], c["scenes_max"])
+    return template.format(channel=c["channel_name"], maxc=c["max_line_chars"], smin=smin, smax=smax, topic=topic)
 
 
 def validate(data: dict, settings: dict) -> list[str]:
     c = settings["content"]
     errors = []
     scenes = data.get("scenes", [])
-    if not c["scenes_min"] <= len(scenes) <= c["scenes_max"] + 2:
-        errors.append(f"need {c['scenes_min']}-{c['scenes_max']} scenes, got {len(scenes)}")
+    smin, smax = c.get(f"{data.get('series', '')}_scenes") or (c["scenes_min"], c["scenes_max"])
+    if not smin <= len(scenes) <= smax + 2:
+        errors.append(f"need {smin}-{smax} scenes, got {len(scenes)}")
     spoken_lines = sum(len(sc.get("lines", [])) for sc in scenes)
     if scenes and spoken_lines < 2.8 * len(scenes):
         errors.append(f"too short: {spoken_lines} lines in {len(scenes)} scenes; give every scene 3-5 lines")
