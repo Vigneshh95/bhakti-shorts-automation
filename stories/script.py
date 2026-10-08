@@ -53,6 +53,8 @@ STYLE = ("Warm, glowing South Indian storybook illustration in one consistent so
          "everyone in the picture; grown-ups have adult faces, adult height and adult proportions. Soft painterly "
          "finish, rich golden and green colours, gentle light, expressive friendly faces, wide 16:9 composition, "
          "clean uncluttered background.")
+STYLE_SCENERY = ("Warm, glowing South Indian storybook illustration, soft painterly finish, rich golden and green "
+                 "colours, gentle light, wide 16:9 composition, a quiet still scene of objects and scenery only.")
 
 SCHEMA = {
     "type": "object",
@@ -281,5 +283,9 @@ def picture_prompt(scene: dict, person_look: str = "", tale_cast: list[dict] | N
         look = person_look if who == "person" else tale.get(who) or CAST.get(who, {}).get("look", "")
         if look:
             looks.append(look)
+    if not scene.get("characters"):
+        # A scene of objects or scenery: a style text that speaks of faces and grown-ups paints people
+        # into it (a lamp still life came back with a family behind it, three times).
+        return f"{scene['picture'].strip()} {STYLE_SCENERY}"
     cast = " Characters: " + "; ".join(looks) + "." if looks else ""
     return f"{scene['picture'].strip()}{cast} {STYLE}"
