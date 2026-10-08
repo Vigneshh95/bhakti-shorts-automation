@@ -86,7 +86,10 @@ def paint(script: dict, folder: Path, work: Path, timeout_min: int = 240, attemp
 
 CHECK_SYSTEM = """You check illustrations for a Tamil children's story video against what each was
 meant to show. For every image (by its label) return ok and, if not ok, issue (what is wrong) and
-fix (one short instruction to the painter that would prevent it).
+fix: one short sentence for the painter saying what SHOULD be shown in its place, in positive words
+only. Never name the unwanted thing in fix (the painter paints whatever is named): for a phone that
+should be gone write "his hands are empty and open", not "remove the phone"; for a wrong forehead
+mark write "three horizontal white ash lines and a small red dot on the forehead".
 ok=false ONLY for clear faults that a viewer would notice:
 - a person who must be there is missing, or an extra main person or a second peacock appears;
 - a person's age is clearly wrong (a grown man or woman drawn as a child, or the reverse);

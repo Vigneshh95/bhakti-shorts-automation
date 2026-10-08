@@ -17,9 +17,8 @@ CAST = {
     "narrator": {"name": "கதைசொல்லி", "voice": "narrator", "look": ""},
     "murugan": {"name": "குட்டி முருகன்", "voice": "murugan",
                 "look": "baby Lord Murugan, an adorable chubby toddler god with big bright kind eyes, curly dark hair, "
-                        "ornate golden crown, forehead marked only with three horizontal white lines of sacred ash "
-                        "(Shaiva tripundra) and one small round red dot at their centre, with no vertical line and no "
-                        "U-shaped mark, golden chest "
+                        "ornate golden crown, forehead marked with three horizontal white lines of sacred ash and "
+                        "one small round red dot at their centre, golden chest "
                         "armour and jewellery, orange-red dhoti, holding a small golden Vel spear"},
     "ilango": {"name": "இளங்கோ", "voice": "boy",
                "look": "Ilango, an 8-year-old Tamil boy with short neat black hair, round face, bright eyes, wearing a "
@@ -31,7 +30,7 @@ CAST = {
                "look": "Avvai Paatti, a gentle Tamil grandmother in her seventies with silver hair in a bun, round "
                        "spectacles, a maroon cotton saree, warm smile"},
     "person": {"name": "", "voice": "adult", "look": ""},   # adults series: this episode's person (described per episode)
-    "peacock": {"name": "மயில்", "voice": "", "look": "a friendly bright blue peacock with a green train"},
+    "peacock": {"name": "மயில்", "voice": "", "look": "one single friendly bright blue peacock bird with a green train"},
     # people inside the story Murugan tells (described in that scene's picture, different each episode)
     "tale_child": {"name": "", "voice": "tale_child", "look": ""},
     "tale_woman": {"name": "", "voice": "tale_woman", "look": ""},
@@ -47,11 +46,13 @@ for _id in TALE_IDS:
     CAST[_id] = {"name": "", "voice": "", "look": ""}
 SPEAKERS = ["narrator", "murugan", "ilango", "kuzhali", "paatti", "person", *TALE_IDS]
 
-STYLE = ("Warm, glowing South Indian storybook illustration in ONE consistent soft stylised animation style for "
-         "everyone in the picture: adults are drawn in the same style as the children but with clearly adult faces, "
-         "height and proportions (never photorealistic, never child-like). Soft painterly finish, rich golden and "
-         "green colours, gentle light, expressive friendly faces, wide 16:9 composition. Each person appears once. "
-         "Any peacock is an ordinary bird. No text, no letters, no writing, no watermark.")
+# Image painters don't understand "no": naming a thing, even to forbid it, tends to paint it (a
+# sentence about peacocks here put peacocks on the sofa in scenes that had none). So this and the
+# cast's looks say only what SHOULD be in the picture.
+STYLE = ("Warm, glowing South Indian storybook illustration in one consistent soft stylised animation style for "
+         "everyone in the picture; grown-ups have adult faces, adult height and adult proportions. Soft painterly "
+         "finish, rich golden and green colours, gentle light, expressive friendly faces, wide 16:9 composition, "
+         "clean uncluttered background.")
 
 SCHEMA = {
     "type": "object",
