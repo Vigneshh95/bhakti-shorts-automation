@@ -194,6 +194,13 @@ Shape, {smin}-{smax} scenes in all:
 4. Back to today: the person tries one small thing, and it is not easy (3-4 scenes).
 5. The Aathichoodi line and its meaning in one sentence; one thing to try today; one question to
    carry (1-2 scenes).
+The tone to aim for (an example of the voice only: never reuse its people, places, tea or words):
+  முருகன்: அண்ணா, ஒரு டீ தானா? ரெண்டு சொல்லியிருக்கலாமே.
+  கார்த்திக்: சின்னப் பையன் எனக்கு புத்தி சொல்றான், பாரு!
+  முருகன்: புத்தி இல்ல. ஒரே ஒரு கேள்வி தான். நேத்து சொன்னது உண்மையா? இல்ல, வலிக்கணும்னு சொன்னதா?
+  கார்த்திக்: வலிக்கணும்னு தான்.
+and an ending that shows instead of telling: he makes tea for the first time; she says only
+"சர்க்கரை ஜாஸ்தி"; he answers "ஆமா... நேத்து என் வார்த்தையும் ஜாஸ்தி". She does not smile, but she stays.
 No medical, legal or financial advice; no blaming of any group; nothing about caste.
 Today's problem: {topic}."""
 
