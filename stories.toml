@@ -166,6 +166,12 @@ pace = 0.86
 [youtube.kids]
 made_for_kids = true
 playlist_id = "PLF70-DN_o7Uc"         # குழந்தைகளுக்கான குட்டி முருகன் கதைகள் | Kutti Murugan Stories for Kids
+days = ["sun", "thu"]                 # two releases a week (India time)
+time = "10:00"                        # a weekend / holiday-morning slot, when children watch with a parent
+footer = "🙏 குட்டி முருகன் கதைகள் — BrahmaNadagam. Subscribe செய்யுங்கள்."
 [youtube.adults]
 made_for_kids = false
 playlist_id = ""
+days = ["wed", "sat"]                 # two releases a week (India time)
+time = "19:00"                        # evening, when most viewers are on YouTube
+footer = "🙏 முருகன் சொன்ன வழி — வாரம் இரு கதைகள். BrahmaNadagam. Subscribe செய்து பகிருங்கள்."
