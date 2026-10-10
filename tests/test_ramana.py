@@ -45,7 +45,7 @@ def test_split_keeps_whole_paragraphs_and_joins_a_short_tail():
 
 def test_series_settings_prompt_and_title_rule():
     s = load_settings(series="ramana")
-    assert s["look"]["talking"] is False and s["video"]["voice"]["engine"] == "fastpitch"
+    assert s["look"]["talking"] is False and s["video"]["voice"]["engine"] == "indicf5"
     system, user = S.build_prompt(planner.Plan(date(2026, 10, 11), "x", source={
         "id": "b:1", "credit": "c", "url": "u", "title": "t", "text": "ரமணர் அமைதி"}), s, [], [("a.jpg", "portrait")])
     assert "takeaway" in system and "ரமணர் அமைதி" in user and "{" not in system

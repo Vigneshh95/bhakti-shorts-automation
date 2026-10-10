@@ -120,7 +120,7 @@ glow_pulse = true
 talking = false                       # a still portrait with slow movement: no moving lips for the sage of silence
 
 [youtube]
-publish_time = "20:30"                # IST: a quiet thought to end the day (Periyava 06:30, Murugan 18:30)
+publish_time = "18:30"                # IST, like the Murugan Short: one Short a day, the three series in turn
 min_lead_minutes = 30
 category_id = "22"
 language = "ta"
@@ -141,16 +141,28 @@ outage_wait_minutes = 10
 
 # The video look for this series only: written into each day's episode.toml.
 [video.voice]
-engine = "fastpitch"                  # the laptop's own Tamil voice: no Kaggle, no token
+# The natural voice model (IndicF5 on Kaggle, as for the Mahaperiyava series) speaking in the calm
+# narrator voice of voices/ramana_ref.wav. That reference was made with the laptop's own voice, so
+# no person's voice is copied. Needs HF_TOKEN. To go back to the laptop voice: engine = "fastpitch"
+# and, in the style below, semitones = -1.0 and pace = 0.84.
+engine = "indicf5"
+reference = "voices/ramana_ref.wav"
+reference_denoise = false
+kaggle_kernel = "ramana-voice"        # this series' own Kaggle notebook (never shared with another series)
+speak_speed = 0.85
+speak_takes = 2
+speak_steps = 40
+speak_cfg = 2.2
+kaggle_timeout_min = 40
 style = "ramana"
 line_gap_ms = 750                     # unhurried: a breath between thoughts
 lead_in_ms = 500
 tail_ms = 1600
 
 [video.voice.styles.ramana]
-speaker = "male"                      # sample A (voice_sample_ramana_A_male_calm.wav); "female" = sample B
-semitones = -1.0
-pace = 0.84
+speaker = "male"                      # only used by the fastpitch alternative
+semitones = 0.0
+pace = 1.0
 formant = "preserved"
 eq_gain_db = 2.0
 warmth_db = 1.0

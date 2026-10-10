@@ -1,10 +1,14 @@
 name: Make a Short
 
-# The daily Shorts, made and uploaded in the cloud with the laptop switched off: the same
-# autopilot as the .bat files.
+# ONE Short a day, the three series in turn, made and uploaded in the cloud with the laptop
+# switched off (the same autopilot as the .bat files):
 #
-#   Murugan       starts 03:47, 06:17, 09:17 IST   -> public 18:30 IST the same day
-#   Mahaperiyava  starts 14:47, 17:17, 20:17, 00:17 IST   -> public 06:30 IST the next morning
+#   day 1  Murugan          made in the morning          -> public 18:30 IST that day
+#   day 2  Mahaperiyava     made the evening of day 1    -> public 06:30 IST
+#   day 3  Ramana Maharshi  made in the morning          -> public 18:30 IST that day
+#   day 4  Murugan again ...                             (day 1 = 10 Oct 2026, see "anchor" below)
+# Until Ramana's pictures are in the private files, Murugan takes Ramana's day.
+# Morning starts: 03:47, 06:17, 09:17 IST. Evening starts: 14:47, 17:17, 20:17, 00:17 IST.
 # The first start that succeeds makes and uploads the Short; later starts see it is done and stop
 # in seconds. They exist because GitHub runs schedules late (often by hours) or skips one.
 # It can also be started by hand: Actions tab > Make a Short > Run workflow.
@@ -17,19 +21,19 @@ on:
     # Times are UTC. GitHub starts scheduled runs late, often by hours (seen: 1 to 5 hours),
     # so every start is early enough that even a 5-hour delay still meets the publish time, and
     # each series has three starts. Minute 17 = the first start of the series.
-    - cron: "17 22 * * *"   # Murugan        03:47 IST   (public 18:30 IST that day)
-    - cron: "47 0 * * *"    # Murugan        06:17 IST
-    - cron: "47 3 * * *"    # Murugan        09:17 IST
-    - cron: "17 9 * * *"    # Mahaperiyava   14:47 IST   (public 06:30 IST the next morning)
-    - cron: "47 11 * * *"   # Mahaperiyava   17:17 IST
-    - cron: "47 14 * * *"   # Mahaperiyava   20:17 IST
-    - cron: "47 18 * * *"   # Mahaperiyava   00:17 IST, last chance (still counts as that evening's)
+    - cron: "17 22 * * *"   # morning   03:47 IST   (Murugan or Ramana day: public 18:30 IST that day)
+    - cron: "47 0 * * *"    # morning   06:17 IST
+    - cron: "47 3 * * *"    # morning   09:17 IST
+    - cron: "17 9 * * *"    # evening   14:47 IST   (on a Murugan day: Mahaperiyava, public 06:30 IST the next morning)
+    - cron: "47 11 * * *"   # evening   17:17 IST
+    - cron: "47 14 * * *"   # evening   20:17 IST
+    - cron: "47 18 * * *"   # evening   00:17 IST, last chance (still counts as that evening's)
   workflow_dispatch:
     inputs:
       series:
         description: Which series
         type: choice
-        options: [periyava, murugan]
+        options: [periyava, murugan, ramana]
         default: periyava
       upload:
         description: Upload to YouTube (off = make only; the video is attached to the run)
@@ -69,23 +73,44 @@ jobs:
         shell: pwsh
         run: |
           $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
-          if ("${{ github.event_name }}" -eq "schedule") {
+          $scheduled = "${{ github.event_name }}" -eq "schedule"
+          $morning = $true
+          if ($scheduled) {
             $hour = [int]("${{ github.event.schedule }}".Split(" ")[1])
-            $series = if ($hour -in 22, 0, 3) { "murugan" } else { "periyava" }
+            $morning = $hour -in 22, 0, 3
             $upload = "true"
           }
           # Which day's Short this is, in India time -- by what the start was MEANT for, not by the
-          # clock when GitHub finally ran it. A Mahaperiyava start belongs to its evening even if it
-          # runs after midnight (2026-10-05: a start fired at 00:17 was taken for the next day and
-          # made a second video for the same morning).
+          # clock when GitHub finally ran it. An evening start belongs to its evening even if it runs
+          # after midnight (2026-10-05: a start fired at 00:17 was taken for the next day and made a
+          # second video for the same morning).
           $now = [DateTime]::UtcNow.AddHours(5.5)
-          $late = $false
-          if ($series -eq "periyava") {
-            if ($now.Hour -lt 5) { $now = $now.AddDays(-1) }                 # after midnight: still yesterday evening's
-            elseif ($now.Hour -lt 12 -and "${{ github.event_name }}" -eq "schedule") { $late = $true }   # past 05:00: too late to be ready for 06:30
-          } elseif ($now.Hour -ge 18 -and "${{ github.event_name }}" -eq "schedule") { $late = $true }   # Murugan after 18:00: its 18:30 slot is gone
+          if ($scheduled -and -not $morning -and $now.Hour -lt 5) { $now = $now.AddDays(-1) }
+          if (-not $scheduled -and $series -eq "periyava" -and $now.Hour -lt 5) { $now = $now.AddDays(-1) }
           $day = $now.ToString("yyyy-MM-dd")
-          $folder = if ($series -eq "murugan") { "auto" } else { "periyava" }
+          $skip = ""
+          if ($scheduled) {
+            # One Short a day, the series in turn. anchor = a Murugan day; the Mahaperiyava Short is
+            # made that same evening and goes public the next morning; Ramana the morning after that.
+            $anchor = [DateTime]::ParseExact("2026-10-10", "yyyy-MM-dd", $null)
+            $turn = ((($now.Date - $anchor).Days % 3) + 3) % 3
+            $hasRamana = [bool](Get-ChildItem ".cache/assets_repo/ramana_images" -File -ErrorAction SilentlyContinue |
+                                Where-Object { $_.Extension -in ".png", ".jpg", ".jpeg", ".webp" })
+            if ($morning) {
+              if ($turn -eq 0) { $series = "murugan" }
+              elseif ($turn -eq 2) { $series = if ($hasRamana) { "ramana" } else { "murugan" } }
+              else { $series = "murugan"; $skip = "today's Short is Mahaperiyava's (made yesterday evening, public 06:30)" }
+            } else {
+              $series = "periyava"
+              if ($turn -ne 0) { $skip = "no Mahaperiyava Short is due tomorrow morning (one Short a day, the series in turn)" }
+            }
+          }
+          $late = $false
+          if ($scheduled -and -not $skip) {
+            if ($series -eq "periyava") { if ($now.Hour -ge 5 -and $now.Hour -lt 12) { $late = $true } }   # past 05:00: too late to be ready for 06:30
+            elseif ($now.Hour -ge 18) { $late = $true }                                                   # after 18:00: the 18:30 slot is gone
+          }
+          $folder = if ($series -eq "murugan") { "auto" } else { $series }
           $history = ".cache/assets_repo/episodes/$folder/history.json"
           $done = $false
           if ($upload -eq "true" -and (Test-Path $history)) {
@@ -94,9 +119,10 @@ jobs:
           # Scheduled runs never post a Short whose face doesn't talk: if the talking face can't be
           # made the run fails (GitHub emails you) and the next start tries again.
           $strict = if ("${{ github.event_name }}" -eq "schedule" -or $upload -eq "true") { "1" } else { "0" }
-          if ($late) { $done = $true }
+          if ($late -or $skip) { $done = $true }
           "series=$series", "upload=$upload", "day=$day", "strict=$strict", "todo=$(if ($done) { 'no' } else { 'yes' })" | Add-Content $env:GITHUB_OUTPUT
-          if ($late) { Write-Host "::warning title=$series::This start ran too late for today's publish time -- skipped (the next day's starts carry on as usual)" }
+          if ($skip) { Write-Host "::notice title=nothing to make::$skip" }
+          elseif ($late) { Write-Host "::warning title=$series::This start ran too late for today's publish time -- skipped (the next day's starts carry on as usual)" }
           elseif ($done) { Write-Host "::notice title=$series::Already uploaded for $day -- nothing to do" }
           else { Write-Host "::notice title=$series::Making the Short for $day (upload: $upload)" }
 
