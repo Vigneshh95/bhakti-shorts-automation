@@ -46,6 +46,63 @@ adults = [
   "grief after losing someone dear",
 ]
 
+# Acted voices (stories/voice.py): Gemini's speech models speak every line as its character, with the
+# emotion of the moment (free on the stories' Gemini key; one request per line, kept once made).
+# enabled = false goes back to the laptop's own voice below.
+[acting]
+enabled = true
+models = ["gemini-3.1-flash-tts-preview", "gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]
+requests_per_minute = 8
+
+[acting.voices.narrator]
+voice = "Sulafat"
+who = "the narrator: a warm woman storyteller telling a story by lamp light, calm and unhurried"
+semitones = 0.0
+[acting.voices.murugan]
+voice = "Leda"
+who = "baby Lord Murugan: a bright, playful five-year-old boy with a smile in his voice, wise but never preachy"
+semitones = 2.5
+formant = "shifted"
+[acting.voices.boy]
+voice = "Leda"
+who = "a lively eight-year-old Tamil boy"
+semitones = 2.0
+formant = "shifted"
+[acting.voices.girl]
+voice = "Zephyr"
+who = "a sweet six-year-old Tamil girl"
+semitones = 2.5
+formant = "shifted"
+[acting.voices.paatti]
+voice = "Gacrux"
+who = "an old Tamil grandmother, slow, kind and a little amused"
+semitones = -1.0
+[acting.voices.adult]
+voice = "Charon"
+who = "a grown Tamil man in a story of old times"
+semitones = 0.0
+[acting.voices.home_man]
+voice = "Orus"
+who = "a Tamil man in his thirties at home, talking fast in everyday spoken Tamil the way husbands really talk"
+semitones = 0.0
+[acting.voices.home_woman]
+voice = "Aoede"
+who = "a Tamil woman around thirty at home, talking in everyday spoken Tamil the way wives really talk"
+semitones = 0.0
+[acting.voices.tale_child]
+voice = "Leda"
+who = "a village child in a story of old times"
+semitones = 3.0
+formant = "shifted"
+[acting.voices.tale_woman]
+voice = "Kore"
+who = "a grown Tamil woman in a story of old times"
+semitones = 0.0
+[acting.voices.old_man]
+voice = "Algenib"
+who = "an old Tamil man with a worn, gentle voice"
+semitones = -1.0
+
 # Voices: the laptop's Tamil voice (IndicTTS), shaped per character.
 [voices.narrator]
 speaker = "female"

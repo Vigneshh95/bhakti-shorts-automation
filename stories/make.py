@@ -199,16 +199,53 @@ def make(folder: Path, settings: dict) -> Path:
                 raise RuntimeError(f"{p.name} is {im.width}x{im.height}: story pictures must be wide (16:9)")
 
     # voices: every line by its speaker's voice; remember which scene each line belongs to
-    voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))
     home = S.home_people(script["scenes"])
     spoken, scene_of, speakers = [], [], []
-    for i, scene in enumerate(script["scenes"]):
-        for line in scene["lines"]:
-            style = S.voice_for(line["speaker"], script.get("tale_cast"), settings["voices"], home)
-            raw = tts.synthesize_lines([line["text"]], style["speaker"], voice, cache)[0]
-            spoken.append(_shape(raw, style, ff, cache))
-            scene_of.append(i)
-            speakers.append(line["speaker"])
+    acting = settings.get("acting", {})
+    if acting.get("enabled"):
+        # Acted voices: each line spoken as its character with the feeling of the moment (stories/voice.py)
+        from stories import voice as V
+        from stories.writer import ask
+
+        if V.directions(script, lambda system, user, schema: ask(settings, system, user, schema)):
+            (folder / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
+        actor = V.Actor(settings, cache, ff)
+        total = sum(len(sc["lines"]) for sc in script["scenes"])
+        done = 0
+        for i, scene in enumerate(script["scenes"]):
+            # One request speaks a character's consecutive lines in the scene (the free allowance is
+            # counted in requests, and a thought spoken in one breath sounds more natural anyway).
+            turns: list[list[dict]] = []
+            for line in scene["lines"]:
+                if turns and turns[-1][0]["speaker"] == line["speaker"]:
+                    turns[-1].append(line)
+                else:
+                    turns.append([line])
+            for turn in turns:
+                role = S.voice_for(turn[0]["speaker"], script.get("tale_cast"), acting["voices"], home)
+                if len(turn) > 1 and all(actor.made(l["text"], role, l["tone"]) for l in turn):
+                    parts = [(l["text"], l["tone"]) for l in turn]          # spoken one by one on an earlier run
+                elif len(turn) > 1:
+                    parts = [(" ".join(l["text"] for l in turn),
+                              " Then: ".join(dict.fromkeys(l["tone"] for l in turn)))]
+                else:
+                    parts = [(turn[0]["text"], turn[0]["tone"])]
+                for text, tone in parts:
+                    spoken.append(actor.speak(text, role, tone))
+                    scene_of.append(i)
+                    speakers.append(turn[0]["speaker"])
+                done += len(turn)
+            log.info("  scene %d of %d spoken (%d of %d lines)", i + 1, len(script["scenes"]), done, total)
+        voice = None
+    else:
+        voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))
+        for i, scene in enumerate(script["scenes"]):
+            for line in scene["lines"]:
+                style = S.voice_for(line["speaker"], script.get("tale_cast"), settings["voices"], home)
+                raw = tts.synthesize_lines([line["text"]], style["speaker"], voice, cache)[0]
+                spoken.append(_shape(raw, style, ff, cache))
+                scene_of.append(i)
+                speakers.append(line["speaker"])
     # Pauses that follow the sense, on top of the even gap between lines: a beat after a question,
     # a breath when someone else answers, a longer rest when the picture changes.
     # People at home answer each other quickly; the narrator, Murugan and the tale take their time.
