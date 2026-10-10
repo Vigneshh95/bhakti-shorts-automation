@@ -20,7 +20,7 @@ GOOD = {
               "அன்பு உன் வழி.", "நம்பிக்கை உன் துணை.", "என் அருள் உன்னுடன்."],
     "keywords": ["உழைப்பு", "பொறுமை"],
     "hook_title": "உழைப்பின் வெற்றி",
-    "youtube_title": "முருகன் அருள் வாக்கு | Power of Hard Work",
+    "youtube_title": "உழைப்பு வீண் போகாது | முருகன் சொல்லும் வழி",
     "youtube_description": "உழைப்பைப் பற்றிய முருகனின் வாக்கு. Murugan's message on hard work.",
     "hashtags": ["#முருகன்", "#Murugan", "#HardWork"],
     "tags": ["Murugan", "முருகன்", "Tamil devotional", "Murugan status", "hard work Tamil", "5"],
@@ -435,3 +435,9 @@ def test_yesterday_means_the_last_picture_used_that_day(tmp_path):
               {"date": "2026-09-27", "image_digest": "LAST", "made_at": "2026-09-27T12:00:00"},
               {"date": "2026-09-26", "image_digest": "OLDER", "made_at": "2026-09-26T23:00:00"}]
     assert h.last_image(before=date(2026, 9, 28)) == "LAST"
+
+
+def test_titles_may_not_all_start_with_the_same_series_phrase(settings):
+    """Daily titles that all began "முருகன் அருள் வாக்கு | ..." look mass-produced (reach fell, 2026-10)."""
+    bad = dict(GOOD, youtube_title="முருகன் அருள் வாக்கு | Power of Hard Work")
+    assert any("fixed phrase" in e for e in S.validate(bad, settings, IDS))

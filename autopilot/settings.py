@@ -17,6 +17,7 @@ SERIES_DEFAULTS = {
     "series": {"name": "murugan", "title": "Murugan Short", "output_prefix": "muruganAuto",
                "launcher": "auto_short.bat"},
     "content": {"title_must_contain": ["முருக", "Murugan"],
+                "title_never_starts": ["முருகன் அருள் வாக்கு", "முருகன் அருள்வாக்கு", "Murugan"],
                 "default_hashtags": ["#முருகன்", "#Murugan", "#TamilDevotional"]},
     "youtube": {"footer": "🙏 தினமும் முருகன் அருள் வாக்கு — Subscribe செய்து பகிருங்கள்.", "playlist_id": ""},
 }

@@ -41,7 +41,8 @@ SYSTEM = """You write daily YouTube Shorts for the Tamil devotional channel "{ch
 Format: Lord Murugan speaks a short message of wisdom directly to the viewer, narrated in Tamil
 over one devotional picture, with word-by-word captions. About 30-45 seconds.
 
-First choose the ONE picture (image_id) from the list that best fits today's message, then
+First choose the ONE picture (image_id) from the list that best fits today's message (when two
+fit equally, take the one where the face is larger and closer: it is watched on a phone), then
 write the message so it feels made for that picture. If a picture has text painted on it, the
 message must agree with that text (or choose another picture).
 
@@ -57,8 +58,11 @@ Write for real reach AND for respect:
   financial advice; quotes attributed to scriptures or real people; mocking any person or faith;
   fear or guilt tactics; claims that a festival is today unless the context says so.
 - hook_title: 2-4 Tamil words shown on screen for the first seconds.
-- youtube_title: at most 70 characters. Start with the Tamil keyword (முருகன் ...) and today's
-  message, then a short English part, e.g. "முருகன் அருள் வாக்கு | Courage in Hard Times".
+- youtube_title: at most 70 characters, in Tamil, and different in shape every day. Lead with
+  TODAY'S message itself, as the words a viewer would feel or search for (a question such as
+  "மனம் தளர்ந்து விட்டதா?", or a striking statement), then "முருகன்" somewhere after it, e.g.
+  "கோபம் வரும்போது இதை நினை | முருகன் சொல்லும் வழி". Never begin with a fixed series phrase such
+  as "முருகன் அருள் வாக்கு": a channel whose titles all start alike looks mass-produced.
   Honest, no clickbait, no ALL CAPS, no hashtags in the title.
 - youtube_description: 2-3 natural Tamil sentences about the message, then 1 English sentence,
   naturally using searched words (Murugan, முருகன், Tamil devotional, today's theme).
@@ -178,6 +182,9 @@ def validate(data: dict, settings: dict, image_ids: list[str]) -> list[str]:
         errors.append(f"youtube_title must be 10-70 characters, got {len(title)}")
     if "#" in title:
         errors.append("youtube_title must not contain hashtags")
+    for start in c.get("title_never_starts") or []:
+        if title.startswith(start):
+            errors.append(f'youtube_title must not begin with the fixed phrase "{start}": lead with the message of the day')
     must = c.get("title_must_contain") or ["முருக", "Murugan"]
     if not any(m in title for m in must):
         errors.append(f"youtube_title must contain one of: {', '.join(must)}")

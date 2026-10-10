@@ -49,6 +49,7 @@ picture_choices = 12
 picture_rest_days = 10              # a picture isn't shown again for this many days after it was used
 themes = []
 title_must_contain = ["பெரியவா", "Periyava"]
+title_never_starts = ["மகா பெரியவா", "மகாபெரியவா", "பெரியவா", "Maha", "Periyava"]
 default_hashtags = ["#மகாபெரியவா", "#Mahaperiyava", "#DeivathinKural"]
 
 [prompts]
@@ -78,8 +79,11 @@ has text painted on it, the message must agree with that text (or choose another
 - keywords: 1-3 key Tamil words of the message, each copied exactly as it appears in the lines
   (without punctuation). They are shown in gold in the captions.
 - hook_title: 2-4 Tamil words shown on screen for the first seconds (today's teaching).
-- youtube_title: at most 70 characters, e.g. "மகா பெரியவா அருள்வாக்கு | The Love of a Mother". It
-  must contain "பெரியவா". Honest, no clickbait, no ALL CAPS, no hashtags.
+- youtube_title: at most 70 characters, in Tamil, and different in shape every day. Lead with
+  TODAY'S teaching itself, as the words a viewer would feel or search for (a question or a
+  striking statement), then "பெரியவா" somewhere after it, e.g. "அம்மாவின் அன்புக்கு ஈடு உண்டா? |
+  மகா பெரியவா". Never begin with a fixed series phrase such as "மகா பெரியவா அருள்வாக்கு".
+  It must contain "பெரியவா". Honest, no clickbait, no ALL CAPS, no hashtags.
 - youtube_description: 2-3 natural Tamil sentences about the message, then 1 English sentence,
   naturally using searched words (Mahaperiyava, Kanchi Periyava, Deivathin Kural, தெய்வத்தின்
   குரல், today's theme). It is a simple retelling of the essence of his teaching, so never

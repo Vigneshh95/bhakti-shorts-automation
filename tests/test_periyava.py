@@ -71,7 +71,7 @@ def test_series_settings_and_prompts():
     system, user = S.build_prompt(planner.Plan(date(2026, 10, 1), "love", source={
         "id": "1:a", "credit": "c", "url": "u", "title": "t", "text": "அம்மா அன்பு"}), p, [], [("a.jpg", "photo")])
     assert "Deivathin Kural" in system and "அம்மா அன்பு" in user and "{" not in system
-    data = dict(GOOD, youtube_title="மகா பெரியவா அருள்வாக்கு | Mother's Love")
+    data = dict(GOOD, youtube_title="அம்மாவின் அன்புக்கு ஈடு உண்டா? | மகா பெரியவா")
     assert S.validate(data, p, ["a.jpg"]) == []
     assert any("பெரியவா" in e for e in S.validate(dict(GOOD), p, ["a.jpg"]))
     assert S.tidy({"hashtags": []}, p)["hashtags"] == ["#மகாபெரியவா", "#Mahaperiyava", "#DeivathinKural"]
