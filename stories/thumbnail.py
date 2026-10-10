@@ -1,5 +1,10 @@
-"""The picture people see before they click: the human moment of the story, close up, beside a
-glowing baby Murugan, with a few very large Tamil words. 1280x720, under 2 MB.
+"""The picture people see before they click. Built the way thumbnails that get clicked are built:
+  - faces with a strong feeling, large (the human moment of the story, close up);
+  - one bright subject that pops (baby Murugan in front of a sunburst, with sparkles);
+  - very few, very large words on tilted colour plates (white on red, black on yellow), readable
+    on a phone at a glance, plus one question that can only be answered by watching;
+  - high contrast and saturation, darkened corners, a bright frame.
+1280x720, under 2 MB.
 
 Text is drawn by FFmpeg's subtitle renderer (libass), which shapes Tamil letters correctly."""
 from __future__ import annotations
@@ -59,32 +64,65 @@ def _cutout(path: Path, box: tuple[float, float, float, float], height: int) -> 
     return part
 
 
+def _sparkle(draw: ImageDraw.ImageDraw, x: int, y: int, r: int, colour=(255, 255, 255)) -> None:
+    """A four-point star."""
+    t = r * 0.22
+    draw.polygon([(x, y - r), (x + t, y - t), (x + r, y), (x + t, y + t), (x, y + r), (x - t, y + t), (x - r, y), (x - t, y - t)],
+                 fill=colour)
+
+
+def _finish(im: Image.Image) -> Image.Image:
+    """Punch: sharper, darker corners, a fine grain so flat areas don't look plastic."""
+    im = im.filter(ImageFilter.UnsharpMask(radius=2, percent=90, threshold=2))
+    w, h = im.size
+    corners = Image.new("L", (w // 8, h // 8), 0)
+    cd = ImageDraw.Draw(corners)
+    for i in range(40):
+        f = i / 40
+        cd.ellipse([-w / 8 * 0.25 * (1 - f) + w / 16 * f * 0.2, -h / 8 * 0.25 * (1 - f) + h / 16 * f * 0.2,
+                    w / 8 * (1.25 - 0.25 * f) - w / 16 * f * 0.2, h / 8 * (1.25 - 0.25 * f) - h / 16 * f * 0.2], fill=int(255 * f ** 0.5))
+    corners = corners.resize((w, h), Image.BICUBIC).filter(ImageFilter.GaussianBlur(40))
+    im = Image.composite(im, ImageEnhance.Brightness(im).enhance(0.45), corners)
+    grain = Image.effect_noise((w, h), 14).convert("RGB")
+    return Image.blend(im, grain, 0.045)
+
+
 def make(out: Path, story: tuple[Path, tuple], murugan: tuple[Path, tuple], big: str, small: str, ffmpeg: Path) -> Path:
-    """story / murugan: (picture, crop box as fractions). big: 2-5 words in two lines ("line one\\Nline two"),
-    the first white and the second yellow. small: one question or promise on the bottom band."""
+    """story / murugan: (picture, crop box as fractions). big: 2-5 words in two lines ("line one\\Nline two"):
+    the first on a red plate, the second on a yellow one. small: one question on the bottom band."""
     top_h = SIZE[1] - BAND
-    canvas = _rays(SIZE, (SPLIT + (SIZE[0] - SPLIT) // 2 - 20, top_h // 2 - 10))
-    left = ImageEnhance.Contrast(ImageEnhance.Color(_crop(story[0], story[1], (SPLIT, top_h))).enhance(1.35)).enhance(1.12)
+    centre = (SPLIT + (SIZE[0] - SPLIT) // 2 - 20, top_h // 2 - 10)
+    canvas = _rays(SIZE, centre)
+    left = ImageEnhance.Contrast(ImageEnhance.Color(_crop(story[0], story[1], (SPLIT, top_h))).enhance(1.45)).enhance(1.18)
     edge = Image.new("L", (SPLIT, top_h), 0)
     ImageDraw.Draw(edge).polygon([(0, 0), (SPLIT, 0), (SPLIT - 110, top_h), (0, top_h)], fill=255)
     canvas.paste(left, (0, 0), edge)
     draw = ImageDraw.Draw(canvas)
-    draw.line([(SPLIT, -4), (SPLIT - 110, top_h)], fill=(255, 255, 255), width=12)        # the slanted white edge
+    draw.line([(SPLIT + 3, -4), (SPLIT - 107, top_h)], fill=(255, 214, 40), width=20)   # the slanted edge: gold, then white
+    draw.line([(SPLIT, -4), (SPLIT - 110, top_h)], fill=(255, 255, 255), width=10)
     child = _cutout(murugan[0], murugan[1], int(top_h * 1.12))
-    child = ImageEnhance.Color(child).enhance(1.3)
+    child = ImageEnhance.Contrast(ImageEnhance.Color(child).enhance(1.4)).enhance(1.08)
     canvas.paste(child, (SPLIT - 55 + (SIZE[0] - SPLIT + 55 - child.width) // 2, top_h - child.height + 30), child)
-    shade = Image.new("RGBA", SIZE, (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shade)
-    for y in range(300):                                    # darker towards the bottom, behind the big words
-        sd.line([(0, top_h - 300 + y), (SPLIT - 110, top_h - 300 + y)], fill=(0, 0, 0, int(140 * (y / 300) ** 1.5)))
-    sd.rectangle([0, top_h, SIZE[0], SIZE[1]], fill=(140, 0, 0, 255))
-    sd.rectangle([0, top_h - 8, SIZE[0], top_h], fill=(255, 214, 40, 255))
-    canvas = Image.alpha_composite(canvas.convert("RGBA"), shade).convert("RGB")
+    canvas = _finish(canvas)
+
+    over = Image.new("RGBA", SIZE, (0, 0, 0, 0))
+    od = ImageDraw.Draw(over)
+    for x, y, r in ((SPLIT + 40, 70, 34), (SIZE[0] - 60, 120, 26), (SPLIT + 75, 440, 20),(SIZE[0] - 95, 400, 30), (SPLIT + 95, 20, 16)):
+        _sparkle(od, x, y, r + 8, (255, 240, 150, 150))
+        _sparkle(od, x, y, r, (255, 255, 255, 255))
+    for i in range(BAND):                                                            # the bottom band: deep red, darker lower down
+        od.line([(0, top_h + i), (SIZE[0], top_h + i)], fill=(int(170 - 80 * i / BAND), 0, 0, 255))
+    od.rectangle([0, top_h - 8, SIZE[0], top_h], fill=(255, 214, 40, 255))
+    frame = 9
+    od.rectangle([0, 0, SIZE[0] - 1, SIZE[1] - 1], outline=(255, 214, 40, 255), width=frame)   # a bright frame
+    canvas = Image.alpha_composite(canvas.convert("RGBA"), over).convert("RGB")
+
     work = out.parent
     work.mkdir(parents=True, exist_ok=True)
     base = work / "thumbnail_base.png"
     canvas.save(base)
     first, _, second = big.partition("\\N")
+    low = top_h - 40
     ass = work / "thumbnail.ass"
     ass.write_text(f"""[Script Info]
 ScriptType: v4.00+
@@ -94,13 +132,17 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Big,Mukta Malar ExtraBold,118,&H00FFFFFF,&H00FFFFFF,&H00000000,&HB4000000,-1,0,0,0,100,100,0,0,1,10,5,1,24,20,{BAND + 18},1
-Style: Small,Mukta Malar ExtraBold,66,&H0030E6FF,&H0030E6FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,2,20,20,24,1
+Style: Red,Mukta Malar ExtraBold,92,&H00FFFFFF,&H00FFFFFF,&H001818D8,&H00000000,-1,0,0,0,100,100,0,0,3,14,7,7,0,0,0,1
+Style: Yellow,Mukta Malar ExtraBold,112,&H00000000,&H00000000,&H0000E1FF,&H00000000,-1,0,0,0,100,100,0,0,3,14,7,7,0,0,0,1
+Style: Mark,Mukta Malar ExtraBold,230,&H0000E1FF,&H0000E1FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,12,6,5,0,0,0,1
+Style: Small,Mukta Malar ExtraBold,68,&H0000F0FF,&H0000F0FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,5,3,2,20,20,22,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:10.00,Big,,0,0,0,,{first}\\N{{\\c&H1EDCFF&}}{second}
-Dialogue: 0,0:00:00.00,0:00:10.00,Small,,0,0,0,,{small}
+Dialogue: 0,0:00:00.00,0:00:10.00,Red,,0,0,0,,{{\\pos(34,{low - 268})\\frz4}}{first}
+Dialogue: 1,0:00:00.00,0:00:10.00,Yellow,,0,0,0,,{{\\pos(34,{low - 138})\\frz4}}{second}
+Dialogue: 2,0:00:00.00,0:00:10.00,Mark,,0,0,0,,{{\\pos({SPLIT + 18},270)\\frz14}}?
+Dialogue: 3,0:00:00.00,0:00:10.00,Small,,0,0,0,,{small}
 """, encoding="utf-8")
     fonts = (ROOT / "assets" / "fonts").relative_to(ROOT).as_posix()
     subprocess.run([str(ffmpeg), "-y", "-loglevel", "error", "-loop", "1", "-t", "1", "-i", str(base.relative_to(ROOT)), "-vf",
