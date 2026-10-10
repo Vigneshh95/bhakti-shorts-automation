@@ -25,7 +25,7 @@ from shorts.log import log, setup_logging
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m autopilot", description="Automatic Murugan Shorts")
     p.add_argument("-v", "--verbose", action="store_true")
-    p.add_argument("--series", default="murugan", help="murugan (autopilot.toml) or periyava (periyava.toml)")
+    p.add_argument("--series", default="murugan", help="murugan (autopilot.toml), periyava (periyava.toml) or ramana (ramana.toml)")
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("--no-upload", action="store_true")
@@ -77,6 +77,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.cmd == "check":
             return _check(args.series)
         elif args.cmd == "source":
+            if args.series == "ramana":
+                from autopilot.settings import load_settings
+                from autopilot.sources import passages
+
+                pstore = passages.Store(load_settings(series="ramana")["paths"]["source"])
+                added = passages.collect_wikisource(
+                    pstore, "ரமண மகரிஷி", 17, "ரமண மகரிஷி (என். வி. கலைமணி; தமிழ் விக்கிமூலம், பொதுக்களம்)")
+                log.info("✅ %d passages collected (%d stored)", added, len(pstore.passages()))
+                return 0
             from autopilot.sources import deivathin_kural as dk
 
             store = dk.Store(ROOT / "sources" / "deivathin_kural")

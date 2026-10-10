@@ -95,6 +95,8 @@ def plan_day(day: date, settings: dict, history: History, judge=None) -> Plan:
     chapters when none of the judged ones is left."""
     if settings["content"].get("source") == "deivathin_kural":
         return _chapter_plan(day, settings, history, judge)
+    if settings["content"].get("source") == "passages":
+        return _passage_plan(day, settings, history)
     fest = festival_for(day, settings.get("festivals", []))
     if fest:
         return Plan(day, f"{fest['name_en']} festival", fest["name_ta"], fest["name_en"], day.weekday() == 1)
@@ -103,6 +105,24 @@ def plan_day(day: date, settings: dict, history: History, judge=None) -> Plan:
     fresh = [t for t in themes if t not in recent] or themes  # all used recently: start the cycle again
     theme = random.Random(day.toordinal()).choice(fresh)       # same day -> same pick if re-run
     return Plan(day, theme, is_tuesday=day.weekday() == 1)
+
+
+def _passage_plan(day: date, settings: dict, history: History) -> Plan:
+    """One passage of the series' books a day: never one already retold, and each day from a
+    different chapter than the day before (the chapters in turn)."""
+    from autopilot.sources.passages import Store
+
+    store = Store(settings["paths"]["source"])
+    used = history.used_sources(before=day)
+    pool = [p for p in store.passages() if p.id not in used]
+    if not pool:
+        raise RuntimeError(f"No passage left to retell in {store.path} (all used): add another book")
+    groups = sorted({p.group for p in pool})
+    group = groups[day.toordinal() % len(groups)]
+    passage = random.Random(day.toordinal()).choice([p for p in pool if p.group == group])  # same day -> same pick
+    return Plan(day, passage.title or "the central teaching of this passage",
+                source={"id": passage.id, "credit": passage.credit, "url": passage.url, "title": passage.title,
+                        "text": passage.text})
 
 
 def _chapter_plan(day: date, settings: dict, history: History, judge) -> Plan:

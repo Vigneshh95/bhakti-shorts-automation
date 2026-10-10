@@ -9,7 +9,7 @@ from pathlib import Path
 from shorts.config import ROOT
 
 
-SERIES_FILES = {"murugan": "autopilot.toml", "periyava": "periyava.toml"}
+SERIES_FILES = {"murugan": "autopilot.toml", "periyava": "periyava.toml", "ramana": "ramana.toml"}
 
 # What differs between series, with the Murugan series' values as defaults (autopilot.toml predates
 # series, so it doesn't list them).

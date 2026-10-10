@@ -44,6 +44,8 @@ episodes/auto/
 # (kept local: the text belongs to its publishers), and the synthesised drone (rebuilt on demand)
 episodes/periyava/
 /periyava_images/
+/ramana_images/
+episodes/ramana/
 /voices/
 /sources/
 assets/tanpura_drone.flac

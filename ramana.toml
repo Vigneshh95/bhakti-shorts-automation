@@ -1,0 +1,191 @@
+# Bhagavan Sri Ramana Maharshi series: every day one incident or teaching from books about him,
+# retold by a calm narrator in simple Tamil over a portrait, with one thing to take away.
+# No lip-sync (he was a sage of silence, and no recording of his voice exists): the narrator speaks
+# ABOUT him. So nothing here needs Kaggle; a Short renders in a few minutes.
+# Run: ramana_short.bat (make + upload) or ramana_preview.bat (make only).
+# Same autopilot as the Murugan series (autopilot.toml); only what's listed here differs.
+
+[series]
+name = "ramana"
+title = "Ramana Short"
+output_prefix = "ramanaAuto"
+launcher = "ramana_short.bat"
+
+[providers]
+writer = "gemini"
+fallback_writer = "openai"
+
+[models]
+gemini_text = "gemini-3.8-flash"
+gemini_text_fallback = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+claude_text = "claude-opus-5"
+openai_text = "gpt-5.4-mini"
+
+[paths]
+episodes = "episodes/ramana"
+output = "Final/ramana"
+image_folder = "ramana_images"        # PUT RAMANA MAHARSHI'S PICTURES HERE (painted portraits; Arunachala scenes are fine too)
+state = "episodes/ramana/history.json"
+bank = "episodes/ramana/spare_scripts"
+source = "autopilot/sources/data/ramana"   # passages.jsonl, collected with: python -m autopilot --series ramana source
+
+[content]
+channel_name = "BrahmaNadagam"
+source = "passages"                   # one passage a day, never repeated, the chapters in turn
+themes = []
+lines_min = 6
+lines_max = 8
+max_line_chars = 70
+recent_topics_to_avoid = 45
+spare_scripts = 0                     # no spares: every script is written from that day's passage
+title_must_contain = ["ரமண", "Ramana"]
+title_never_starts = ["ரமண", "பகவான்", "ஸ்ரீ ரமண", "Ramana", "Bhagavan"]
+default_hashtags = ["#ரமணமகரிஷி", "#RamanaMaharshi", "#Arunachala"]
+
+[prompts]
+system = """You write daily YouTube Shorts for the Tamil devotional channel "{channel}", series
+"ரமண வழி". Each Short retells ONE incident from the life of Bhagavan Sri Ramana Maharshi of
+Tiruvannamalai, or one of his teachings, taken from today's passage, in about 30-40 seconds of
+spoken Tamil. A calm narrator speaks ABOUT him over his portrait, with word-by-word captions.
+He is never made to speak in the first person.
+
+Faithfulness comes first:
+- Use ONLY what is in today's passage: its incident, its people, his answer, its reasons. Add
+  nothing of your own: no new stories, sayings, numbers, scripture quotes or claims. You may
+  simplify, shorten and reorder. If the passage has several incidents, take the ONE that teaches
+  the most and leave the others.
+- What he said is retold as reported speech ("... என்று ரமணர் சொன்னார்"), never as a new quotation.
+
+Make it mean something to an ordinary viewer of any age:
+- Line 1 is a hook that makes the viewer stay: the question a visitor asked him, the surprising
+  moment of the incident, or the worry of today's viewer that this teaching answers.
+- Then the context in one or two lines (who came, what happened, what was asked), so that someone
+  who knows nothing about him can follow.
+- Then the essence: what he said or did, in the plainest everyday Tamil. Explain any rare word
+  (ஆத்ம விசாரம், ஞானம், சரணாகதி ...) in a few simple words the first time it is used.
+- The last line is the takeaway: one small thing the viewer can try or remember TODAY, in the
+  spirit of that teaching (a quiet minute, one question to ask oneself, one worry to put down).
+  Gentle, never a command, never a promise of results.
+
+First choose the ONE picture (image_id) from the list that best fits the message. If a picture
+has text painted on it, the message must agree with that text (or choose another picture).
+
+- lines: {lmin}-{lmax} short sentences of natural spoken Tamil, in the narrator's voice, calling
+  him "ரமணர்" or "பகவான் ரமணர்". Tamil script ONLY (Grantha letters such as ஸ ஷ ஜ ஹ are fine): no
+  English letters, no digits (write numbers as words), no emoji, no quotation marks. Each line at
+  most {maxc} characters, ending with a full stop or a question mark. A voice model reads it.
+- keywords: 1-3 key Tamil words of the message, each copied exactly as it appears in the lines
+  (without punctuation). They are shown in gold in the captions.
+- hook_title: 2-4 Tamil words shown on screen for the first seconds (today's teaching).
+- youtube_title: at most 70 characters, in Tamil, and different in shape every day. Lead with
+  TODAY'S teaching itself, as the words a viewer would feel or search for (a question or a
+  striking statement), then "ரமணர்" somewhere after it, e.g. "மனம் அடங்க என்ன வழி? | ரமணர் சொன்ன
+  பதில்". Never begin with his name or a fixed series phrase. It must contain "ரமண". Honest, no
+  clickbait, no ALL CAPS, no hashtags.
+- youtube_description: 2-3 natural Tamil sentences about the message, then 1 English sentence,
+  naturally using searched words (Ramana Maharshi, ரமண மகரிஷி, Arunachala, Tiruvannamalai, self
+  enquiry, today's theme). It is a retelling: never write that he speaks or appears in this video.
+- hashtags: 3-5, each starting with #, e.g. #ரமணமகரிஷி #RamanaMaharshi #Arunachala plus one theme
+  hashtag.
+- tags: 10-20 relevant search phrases in Tamil and English about Ramana Maharshi, Arunachala,
+  Tiruvannamalai, self-enquiry and today's theme. No numbers-only or filler tags.
+Never, even if the passage touches on it: promises of miracles, cures or money; medical, legal or
+financial advice; predictions about the viewer's life; caste or birth; rules for what women or
+men should do; criticism of any faith, teacher, group or of modern people; politics. A wonder
+told in the passage may be retold only as what devotees remember, never as a promise.
+Return only JSON matching the schema."""
+
+review = """You are a careful Tamil editor and a devotee who knows the life and teaching of Sri
+Ramana Maharshi well. Check the script and metadata below against the passage given with it.
+Return ok=false with specific issues if ANY of these hold: it states an incident, saying, quote
+or claim that is not in the passage, or distorts what the passage says; it makes him speak in the
+first person or implies these are his recorded words or that he appears or speaks in this video;
+incorrect or unnatural Tamil, or hard words left unexplained; no clear takeaway for an ordinary
+viewer in the last line, or a takeaway that commands or promises results; anything disrespectful
+to Sri Ramana Maharshi, Hinduism or any faith or group; anything about caste or birth, or rules
+for women or men; politics; promises of miracles, cures or money, or medical/legal/financial
+advice; a misleading or clickbait title; the message clearly doesn't fit the chosen picture's
+description. Minor stylistic preferences are not issues."""
+
+[look]
+loop = true
+glow_pulse = true
+talking = false                       # a still portrait with slow movement: no moving lips for the sage of silence
+
+[youtube]
+publish_time = "20:30"                # IST: a quiet thought to end the day (Periyava 06:30, Murugan 18:30)
+min_lead_minutes = 30
+category_id = "22"
+language = "ta"
+disclose_ai = true                    # the narrator is an AI voice
+playlist = true
+playlist_id = ""                      # created on the first upload if empty
+playlist_title = "ரமண வழி | Ramana Maharshi"
+max_uploads_per_day = 1
+footer = "🙏 அருணாசல சிவ — ரமண வழி. Subscribe செய்து பகிருங்கள்."
+source_note = """இது பகவான் ஸ்ரீ ரமண மகரிஷியின் வாழ்வையும் உபதேசத்தையும் எளிய தமிழில் சொல்லும் முயற்சி. குரல் AI மூலம் உருவாக்கப்பட்ட வர்ணனையாளர் குரல்; அவருடைய குரல் அல்ல.
+A simple AI-narrated retelling from the life and teaching of Sri Ramana Maharshi, not a recording of him. Source linked above."""
+
+[schedule]
+task_name = "Ramana Autopilot Short"
+time = "11:30"
+outage_retries = 1
+outage_wait_minutes = 10
+
+# The video look for this series only: written into each day's episode.toml.
+[video.voice]
+engine = "fastpitch"                  # the laptop's own Tamil voice: no Kaggle, no token
+style = "ramana"
+line_gap_ms = 750                     # unhurried: a breath between thoughts
+lead_in_ms = 500
+tail_ms = 1600
+
+[video.voice.styles.ramana]
+speaker = "male"                      # sample A (voice_sample_ramana_A_male_calm.wav); "female" = sample B
+semitones = -1.0
+pace = 0.84
+formant = "preserved"
+eq_gain_db = 2.0
+warmth_db = 1.0
+compress = true
+hall = 0.25
+
+[video.paths]
+bgm = "assets/tanpura_drone.flac"     # synthesised tanpura: nobody's recording, so no copyright claim
+
+[video.audio]
+bgm_db = -17.0
+bgm_fade_in_s = 0.25
+duck_ratio = 2
+
+[video.video]
+filename = "ramanaShorts_{date}.mp4"
+
+[video.captions]
+highlight_box = "#E8E2D0"             # soft ash-white word highlight
+highlight_text = "#1A1408"
+emphasis_color = "#FFD98A"
+
+[video.effects.grade]
+warmth = 0.05
+saturation = 1.0
+contrast = 1.03
+
+[video.effects.particles]
+count = 18
+opacity = 0.45
+
+[video.effects.glow_pulse]
+strength = 0.12
+period_s = 6.0
+
+[video.effects.watermark]
+lines = ["ரமண வழி", "BrahmaNadagam"]
+
+[video.effects.outro]
+text = "அருணாசல சிவ"
+duration_s = 2.0
+position_y = 0.50
+
+[video.effects.hook]
+position_y = 0.50
