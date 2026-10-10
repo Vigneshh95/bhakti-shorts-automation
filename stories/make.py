@@ -288,5 +288,13 @@ def make(folder: Path, settings: dict) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
     render.render(segments, effects, ass, aud, cfg, work, out)
     shutil.copyfile(out, folder / "video.mp4")
+    try:   # the thumbnail: pictures, crops and words chosen from the story itself (stories/thumbnail.py)
+        from stories import thumbnail
+        from stories.writer import ask
+
+        thumbnail.for_story(folder, script, pictures, lambda sy, us, sc, im: ask(settings, sy, us, sc, im), ff)
+        log.info("  thumbnail: %s", folder / "thumbnail.jpg")
+    except Exception as e:  # noqa: BLE001 -- the video is made; the thumbnail can be drawn on the next run
+        log.warning("  the thumbnail was not made (%s)", str(e).splitlines()[0][:160])
     log.info("✅ %s (%.0f s)", out, aud.duration)
     return out
