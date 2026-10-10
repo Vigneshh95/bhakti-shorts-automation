@@ -93,7 +93,7 @@ class Actor:
         # Each speech model gives 10 free requests a day PER KEY. The Shorts' key has its own speech
         # allowance, which the Shorts never use (they only write text), so the stories use both.
         keys = list(dict.fromkeys(k for k in (api_key("GEMINI_API_KEY_STORIES"), api_key("GEMINI_API_KEY")) if k))
-        self.models = [(model, key) for key in keys for model in self.cfg["models"]]
+        self.models = [(model, key) for model in self.cfg["models"] for key in keys]   # best model first, on every key
         self.cache, self.ffmpeg = cache, ffmpeg
         self.last = 0.0
 
@@ -138,11 +138,15 @@ class Actor:
             prompt = (f"You are a voice actor in a Tamil audio drama, playing {role['who']}. Direction: {tone} "
                       f"Speak in natural everyday Tamil exactly as written, like a real person and not like someone "
                       f"reading. Say only this line, nothing else:\n{text}")
-            limit = 2.5 + 0.2 * len(text)   # far longer than the line needs: it read the direction aloud, try again
-            for attempt in range(3):
+            # A take far longer than the line needs is a ramble (seen: 26 s for two words): never kept.
+            # Each new try costs one of the day's free requests, so two tries, then the run stops.
+            for attempt in range(2):
                 pcm = self._pcm(prompt, role["voice"])
-                if len(pcm) / 48000 <= limit or attempt == 2:
+                if len(pcm) / 48000 <= too_long(text):
                     break
+                log.info("  a rambling take was thrown away (%.0f s for %d letters)", len(pcm) / 48000, len(text))
+            else:
+                raise VoiceLimit(f"no clean take for the line: {text[:40]}… -- run again later")
             raw = out.with_suffix(".raw.wav")
             with wave.open(str(raw), "wb") as w:
                 w.setnchannels(1)
@@ -161,6 +165,11 @@ class Actor:
             raw.unlink(missing_ok=True)
         info = sf.info(out)
         return LineAudio(text, out, info.samplerate, info.duration, _spread(text, info.duration))
+
+
+def too_long(text: str) -> float:
+    """Seconds beyond which a take cannot be just this line (slow, emotional speech is ~0.11 s a letter)."""
+    return 2.5 + 0.2 * len(text)
 
 
 def _spread(text: str, duration: float) -> list[Word]:
