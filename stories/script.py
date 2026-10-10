@@ -19,7 +19,9 @@ CAST = {
                 "look": "baby Lord Murugan, an adorable chubby toddler god with big bright kind eyes, curly dark hair, "
                         "ornate golden crown, forehead marked with three horizontal white lines of sacred ash and "
                         "one small round red dot at their centre, golden chest "
-                        "armour and jewellery, orange-red dhoti, holding a small golden Vel spear"},
+                        "armour and jewellery, orange-red dhoti, holding his Vel in one hand: a spear made entirely "
+                        "of shining gold, with a slender golden shaft and a broad leaf-shaped golden blade at the "
+                        "top (the whole Vel is gold: no silver, no steel, no wood)"},
     "ilango": {"name": "இளங்கோ", "voice": "boy",
                "look": "Ilango, an 8-year-old Tamil boy with short neat black hair, round face, bright eyes, wearing a "
                        "blue half-sleeve shirt and khaki shorts"},
