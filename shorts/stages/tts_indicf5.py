@@ -113,7 +113,8 @@ def _speak_on_kaggle(lines: list[str], ref: Path, ref_text: str, cfg: dict, work
     if len(script.encode("utf-8")) > 900_000:
         raise RuntimeError("the voice sample is too large for a Kaggle notebook; use a shorter clip (10-15 s)")
     try:
-        dest = kaggle_talk.run_kernel(KERNEL_SLUG, script, work, int(cfg["voice"].get("kaggle_timeout_min", 30)),
+        dest = kaggle_talk.run_kernel(cfg["voice"].get("kaggle_kernel", KERNEL_SLUG), script, work,
+                                      int(cfg["voice"].get("kaggle_timeout_min", 30)),
                                       doing="speaking")
     except kaggle_talk.KaggleUnavailable as e:
         # No quiet fallback to a different voice: a series with a set voice stops with the reason.

@@ -38,6 +38,8 @@ lines_max = 8
 max_line_chars = 70
 recent_topics_to_avoid = 45
 spare_scripts = 0                     # no spares: every script is written from that day's passage
+picture_choices = 12
+picture_rest_days = 10                # a picture isn't shown again for this many days after it was used
 title_must_contain = ["ரமண", "Ramana"]
 title_never_starts = ["ரமண", "பகவான்", "ஸ்ரீ ரமண", "Ramana", "Bhagavan"]
 default_hashtags = ["#ரமணமகரிஷி", "#RamanaMaharshi", "#Arunachala"]
@@ -60,7 +62,12 @@ Make it mean something to an ordinary viewer of any age:
 - Line 1 is a hook that makes the viewer stay: the question a visitor asked him, the surprising
   moment of the incident, or the worry of today's viewer that this teaching answers.
 - Then the context in one or two lines (who came, what happened, what was asked), so that someone
-  who knows nothing about him can follow.
+  who knows nothing about him can follow. When the passage is a question and its answer, tell it
+  that way: a thoughtful seeker's honest doubt, asked as people would ask it today, and then the
+  answer. Name the questioner only if the passage does.
+- Sound like a wise, warm elder thinking aloud with the viewer, not like a book being read: short
+  sentences, one idea in each, the way a calm teacher speaks. A question in the script ends with a
+  question mark, and the line after it answers it.
 - Then the essence: what he said or did, in the plainest everyday Tamil. Explain any rare word
   (ஆத்ம விசாரம், ஞானம், சரணாகதி ...) in a few simple words the first time it is used.
 - The last line is the takeaway: one small thing the viewer can try or remember TODAY, in the
