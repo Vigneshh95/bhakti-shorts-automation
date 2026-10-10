@@ -35,7 +35,7 @@ PICTURE_SIZE = (1344, 768)
 # What a story video changes in the Shorts engine's settings (config.toml stays as it is).
 VIDEO = {
     "video": {"width": 1920, "height": 1080},
-    "voice": {"style": "story", "line_gap_ms": 550, "lead_in_ms": 1200, "tail_ms": 2500,
+    "voice": {"style": "story", "line_gap_ms": 350, "lead_in_ms": 1200, "tail_ms": 2500,
               "styles": {"story": {"speaker": "female", "semitones": 0.0, "pace": 1.0, "formant": "preserved",
                                    "eq_gain_db": 0.0, "compress": True}}},
     "audio": {"bgm_db": -21.0, "duck_ratio": 3},
@@ -200,24 +200,27 @@ def make(folder: Path, settings: dict) -> Path:
 
     # voices: every line by its speaker's voice; remember which scene each line belongs to
     voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))
+    home = S.home_people(script["scenes"])
     spoken, scene_of, speakers = [], [], []
     for i, scene in enumerate(script["scenes"]):
         for line in scene["lines"]:
-            style = S.voice_for(line["speaker"], script.get("tale_cast"), settings["voices"])
+            style = S.voice_for(line["speaker"], script.get("tale_cast"), settings["voices"], home)
             raw = tts.synthesize_lines([line["text"]], style["speaker"], voice, cache)[0]
             spoken.append(_shape(raw, style, ff, cache))
             scene_of.append(i)
             speakers.append(line["speaker"])
     # Pauses that follow the sense, on top of the even gap between lines: a beat after a question,
     # a breath when someone else answers, a longer rest when the picture changes.
+    # People at home answer each other quickly; the narrator, Murugan and the tale take their time.
     for k in range(len(spoken) - 1):
-        extra = 0.0
+        chat = speakers[k] in home and speakers[k + 1] in home and scene_of[k + 1] == scene_of[k]
+        extra = 0.0 if chat else 0.20
         if spoken[k].text.rstrip().endswith("?"):
-            extra += 0.35
+            extra += 0.15 if chat else 0.35
         if spoken[k].text.rstrip().endswith(("...", "…")):
             extra += 0.30
         if speakers[k + 1] != speakers[k]:
-            extra += 0.15
+            extra += 0.05 if chat else 0.15
         if scene_of[k + 1] != scene_of[k]:
             extra += 0.55
         if extra:

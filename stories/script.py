@@ -295,12 +295,32 @@ def validate(data: dict, settings: dict) -> list[str]:
     return errors
 
 
-def voice_for(speaker: str, tale_cast: list[dict] | None, voices: dict) -> dict:
+HOME_KINDS = {"man": "home_man", "woman": "home_woman"}   # today's grown-ups: everyday pace, their own sound
+
+
+def home_people(scenes: list[dict]) -> set[str]:
+    """The person of today's story and everyone who shares a scene with them (wife, son, mother...):
+    they talk like people at home, quicker than the narrator and the people of Murugan's tale."""
+    home = {"person"}
+    for scene in scenes:
+        who = set(scene.get("characters", []))
+        if "person" in who:
+            home |= who & set(TALE_IDS)
+    return home
+
+
+def voice_for(speaker: str, tale_cast: list[dict] | None, voices: dict, home: set[str] | None = None) -> dict:
     """The voice settings for a speaker: the cast's own, or for a person in the tale the voice of
     their kind, shifted a little by their id so two of a kind differ."""
     tale = {t.get("id"): t for t in tale_cast or []}
+    home = home or set()
+    if speaker == "person" and "person" in home and "home_man" in voices:
+        return voices["home_man"]
     if speaker in tale:
-        style = dict(voices[TALE_KINDS.get(tale[speaker].get("kind"), "adult")])
+        kind = tale[speaker].get("kind")
+        if speaker in home and HOME_KINDS.get(kind) in voices:
+            return voices[HOME_KINDS[kind]]
+        style = dict(voices[TALE_KINDS.get(kind, "adult")])
         style["semitones"] = style["semitones"] + TALE_SHIFT.get(speaker, 0.0)
         return style
     return voices[CAST.get(speaker, {}).get("voice") or "narrator"]

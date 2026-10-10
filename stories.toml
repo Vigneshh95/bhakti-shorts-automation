@@ -77,6 +77,18 @@ pace = 0.84
 speaker = "male"
 semitones = 0.0
 pace = 0.92
+# Today's grown-ups (the person of the story and their family): everyday pace. The woman's voice is
+# lighter than the narrator's (same base voice), so the two are never mistaken for each other.
+[voices.home_man]
+speaker = "male"
+semitones = 0.3
+pace = 1.05
+[voices.home_woman]
+speaker = "female"
+semitones = 1.8
+pace = 1.07
+formant = "shifted"
+clarity_db = 2.5
 [voices.tale_child]
 speaker = "male"
 semitones = 5.0
