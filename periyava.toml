@@ -122,7 +122,7 @@ glow_pulse = true
 talking = true                        # lips move with the voice (SadTalker on Kaggle, ~10 min)
 
 [youtube]
-publish_time = "06:30"                # IST: when people start their day
+publish_time = "18:30"                # IST, like the Murugan Short: one Short a day, the two series on alternate days
 min_lead_minutes = 30
 category_id = "22"
 language = "ta"
@@ -137,7 +137,7 @@ A simple AI-voiced retelling of the essence of Sri Mahaperiyava's teaching, not 
 
 [schedule]
 task_name = "Periyava Autopilot Short"
-time = "10:45"                        # after the Murugan run (10:00); goes public 06:30 next morning
+time = "10:45"                        # laptop task (if installed): goes public 18:30 that day
 outage_retries = 1
 outage_wait_minutes = 10
 
