@@ -21,11 +21,23 @@ class SignInRequired(RuntimeError):
     pass
 
 
-def channel_config() -> dict:
+def channel_config(settings: dict | None = None) -> dict:
+    """The channel a series uploads to: the main one (config.ini), or its own when the series'
+    [youtube] token_file names another sign-in (the kids' channel). On the cloud machine that
+    file's place comes from YT_TOKEN_FILE_<SERIES NAME>."""
     cp = configparser.ConfigParser()
     cp.read(ROOT / "config.ini", encoding="utf-8")
     resolve = lambda v: Path(v) if Path(v).is_absolute() else ROOT / v  # noqa: E731
     import os
+
+    yt = (settings or {}).get("youtube", {})
+    if yt.get("token_file"):
+        name = (settings or {}).get("series", {}).get("name", "").upper()
+        return {
+            "client_secrets": resolve(os.environ.get("YT_CLIENT_SECRET_FILE") or cp.get("Paths", "client_secrets")),
+            "token_file": resolve(os.environ.get(f"YT_TOKEN_FILE_{name}") or yt["token_file"]),
+            "playlist_id": "", "instagram_url": "", "support_url": "",   # the main channel's links don't belong here
+        }
 
     # config.ini names this laptop's files; another machine (the cloud runner) points to its own
     return {
@@ -125,9 +137,16 @@ def upload(video: Path, script: Script, settings: dict, publish_at: datetime | N
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    channel = channel_config()
+    channel = channel_config(settings)
     yt = build("youtube", "v3", credentials=_credentials(channel, interactive), cache_discovery=False)
-    status = {"selfDeclaredMadeForKids": False, "containsSyntheticMedia": bool(settings["youtube"]["disclose_ai"])}
+    wanted = settings["youtube"].get("channel_id")
+    if wanted:   # never a kids' Short on the main channel, or the other way round
+        mine = yt.channels().list(part="snippet", mine=True).execute()["items"][0]
+        if mine["id"] != wanted:
+            raise RuntimeError(f"this series belongs on another channel, but the sign-in is for "
+                               f"\"{mine['snippet']['title']}\": nothing was uploaded")
+    status = {"selfDeclaredMadeForKids": bool(settings["youtube"].get("made_for_kids", False)),
+              "containsSyntheticMedia": bool(settings["youtube"]["disclose_ai"])}
     if publish_at:
         status.update(privacyStatus="private", publishAt=publish_at.strftime("%Y-%m-%dT%H:%M:%SZ"))
     else:
@@ -193,12 +212,12 @@ def _series_playlist(yt, settings: dict) -> str:
         return ""
 
 
-def preflight(interactive: bool) -> bool:
+def preflight(interactive: bool, settings: dict | None = None) -> bool:
     """Checks (and if needed renews) the YouTube sign-in BEFORE the run does any work.
     Interactive: opens the browser for approval right away. Unattended: returns False instead,
     so the run can still make the video and upload it after the user approves."""
     try:
-        _credentials(channel_config(), interactive)
+        _credentials(channel_config(settings), interactive)
         return True
     except SignInRequired:
         return False

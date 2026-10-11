@@ -231,7 +231,7 @@ def _run(settings: dict, day: date, upload: bool, publish_now: bool, force: bool
         signed_in = True
         if upload:
             with timer.stage("youtube sign-in"):
-                signed_in = youtube.preflight(interactive)
+                signed_in = youtube.preflight(interactive, settings)
                 if not signed_in:
                     log.warning("  YouTube sign-in has expired: making the video now; it will upload after you approve.")
                     name, bat = settings["series"]["title"], settings["series"]["launcher"]

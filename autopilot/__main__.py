@@ -25,7 +25,7 @@ from shorts.log import log, setup_logging
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m autopilot", description="Automatic Murugan Shorts")
     p.add_argument("-v", "--verbose", action="store_true")
-    p.add_argument("--series", default="murugan", help="murugan (autopilot.toml), periyava (periyava.toml) or ramana (ramana.toml)")
+    p.add_argument("--series", default="murugan", help="murugan (autopilot.toml), periyava (periyava.toml), ramana (ramana.toml) or kids (kids_shorts.toml)")
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("--no-upload", action="store_true")

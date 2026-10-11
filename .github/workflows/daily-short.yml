@@ -4,6 +4,8 @@ name: Make a Short
 # same autopilot as the .bat files). Murugan and Mahaperiyava take alternate days:
 #
 #   12 Oct 2026 Murugan, 13 Oct Mahaperiyava, 14 Oct Murugan, ...   (see "anchor" below)
+# The kids' channel ("குட்டி முருகன் கதைகள்") gets its own Short EVERY day at 17:30 IST: baby Murugan
+# telling small children one good habit. Its starts: 04:37, 08:07 and 12:07 IST.
 # The Ramana Maharshi series is built but on hold (no pictures yet): it can be started by hand.
 # Starts: 03:47, 06:17, 09:17, 14:47 and 17:17 IST. The first start that succeeds makes and
 # uploads the Short; later starts see it is done and stop in seconds. They exist because GitHub
@@ -23,12 +25,15 @@ on:
     - cron: "47 3 * * *"    # 09:17 IST
     - cron: "17 9 * * *"    # 14:47 IST
     - cron: "47 11 * * *"   # 17:17 IST, last chance
+    - cron: "7 23 * * *"    # kids' channel  04:37 IST   (public 17:30 IST that day)
+    - cron: "37 2 * * *"    # kids' channel  08:07 IST
+    - cron: "37 6 * * *"    # kids' channel  12:07 IST, last chance
   workflow_dispatch:
     inputs:
       series:
         description: Which series
         type: choice
-        options: [periyava, murugan, ramana]
+        options: [periyava, murugan, ramana, kids]
         default: periyava
       upload:
         description: Upload to YouTube (off = make only; the video is attached to the run)
@@ -53,6 +58,7 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       YT_CLIENT_SECRET_FILE: ${{ github.workspace }}\client_secret.json
       YT_TOKEN_FILE: ${{ github.workspace }}\youtube_token.json
+      YT_TOKEN_FILE_KIDS: ${{ github.workspace }}\kids_token.json
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +72,8 @@ jobs:
       - name: What to make today
         id: plan
         shell: pwsh
+        env:
+          HAS_KIDS_SIGN_IN: ${{ secrets.YT_TOKEN_KIDS_JSON != '' }}
         run: |
           $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
           $scheduled = "${{ github.event_name }}" -eq "schedule"
@@ -81,13 +89,18 @@ jobs:
             $turn = ((($now.Date - $anchor).Days % 2) + 2) % 2
             $series = if ($turn -eq 0) { "murugan" } else { "periyava" }
             if ($now.Hour -ge 18) { $late = $true }
+            if ([int]("${{ github.event.schedule }}".Split(" ")[1]) -in 23, 2, 6) {   # the kids' channel's own starts
+              $series = "kids"
+              $late = $now.Hour -ge 17
+            }
           }
           $folder = if ($series -eq "murugan") { "auto" } else { $series }
           $done = $false
           if ($upload -eq "true") {
             # Done when ANY series already has a Short that goes public today (so there is never a
             # second Short on one day, whichever series or start made the first).
-            foreach ($f in "auto", "periyava", "ramana") {
+            # (The kids' channel is separate: it has its own Short every day.)
+            foreach ($f in $(if ($series -eq "kids") { @("kids") } else { "auto", "periyava", "ramana" })) {
               $history = ".cache/assets_repo/episodes/$f/history.json"
               if (-not (Test-Path $history)) { continue }
               foreach ($r in (Get-Content $history -Raw -Encoding utf8 | ConvertFrom-Json)) {
@@ -101,6 +114,10 @@ jobs:
           # made the run fails (GitHub emails you) and the next start tries again.
           $strict = if ("${{ github.event_name }}" -eq "schedule" -or $upload -eq "true") { "1" } else { "0" }
           if ($late) { $done = $true }
+          if ($series -eq "kids" -and $upload -eq "true" -and $env:HAS_KIDS_SIGN_IN -ne "true") {
+            $done = $true
+            Write-Host "::warning title=kids::The YT_TOKEN_KIDS_JSON secret is not set, so the kids' channel can't be uploaded to yet -- skipped"
+          }
           "series=$series", "upload=$upload", "day=$day", "strict=$strict", "todo=$(if ($done) { 'no' } else { 'yes' })" | Add-Content $env:GITHUB_OUTPUT
           if ($late) { Write-Host "::warning title=$series::This start ran too late for today's publish time -- skipped (the next day's starts carry on as usual)" }
           elseif ($done) { Write-Host "::notice title=$series::A Short is already uploaded for $day -- nothing to do" }
@@ -136,7 +153,9 @@ jobs:
           KAGGLE_ACCESS_TOKEN: ${{ secrets.KAGGLE_ACCESS_TOKEN }}
           YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
           YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          YT_TOKEN_KIDS_JSON: ${{ secrets.YT_TOKEN_KIDS_JSON }}
         run: |
+          if ($env:YT_TOKEN_KIDS_JSON) { [IO.File]::WriteAllText($env:YT_TOKEN_FILE_KIDS, $env:YT_TOKEN_KIDS_JSON) }
           robocopy .cache/assets_repo . /E /XD .git /XF README.md /NFL /NDL /NJH /NJS | Out-Null
           if ($LASTEXITCODE -ge 8) { Write-Host "::error::could not copy the private files"; exit 1 }
           git -C .cache/assets_repo config user.name "cloud"; git -C .cache/assets_repo config user.email "cloud@users.noreply.github.com"
