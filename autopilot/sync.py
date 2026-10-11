@@ -93,7 +93,7 @@ def _merge_state() -> None:
     for side_a, side_b in ((CLONE, ROOT), (ROOT, CLONE)):
         for series in ("adults", "kids"):
             for record in (side_a / "story_episodes").glob(f"{series}-*/*.json"):
-                if record.name in ("script.json", "published.json"):
+                if record.name in ("script.json", "published.json", "approved.json"):
                     target = side_b / record.relative_to(side_a)
                     if not target.exists() or (record.name == "script.json" and record.stat().st_mtime > target.stat().st_mtime
                                                and record.read_bytes() != target.read_bytes()):

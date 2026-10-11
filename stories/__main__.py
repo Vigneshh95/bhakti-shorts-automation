@@ -2,12 +2,14 @@
 
   python -m stories run --series adults       continue the story in progress, or start the next one
   python -m stories run --series kids --no-upload
+  python -m stories approve --series adults   you watched the finished story and are happy: upload it
   python -m stories status                    what is made, scheduled and waiting
   python -m stories signin --series kids      sign in to that series' YouTube channel (opens the browser)
 
 A story is made in steps that can each stop and be picked up on the next run (the free speech
 models allow a limited number of lines a day; pictures take over an hour on Kaggle):
-  write the script -> paint and check the pictures -> act the voices -> render -> thumbnail -> upload
+  write the script -> paint and check the pictures -> act the voices -> render -> thumbnail
+  -> YOU WATCH IT AND APPROVE ([pipeline] review_first) -> upload into the next release slot
 `run` does as many steps as it can today. It starts a NEW story only when the series has fewer than
 [pipeline] stories_ahead stories waiting to go public, so there is always one ready for the next
 release slot (stories.toml: [youtube.<series>] days + time) and never a pile of them."""
@@ -89,19 +91,59 @@ def _run(series: str, upload: bool, interactive: bool, settings: dict, make, Voi
         (folder / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
         log.info("  \"%s\" (%d scenes)", script["title_ta"], len(script["scenes"]))
 
-    try:
-        log.info("▶ pictures, voices and video for %s", folder.name)
-        make.make(folder, settings)
-    except VoiceLimit as e:
-        return f"{series}: {folder.name} is waiting for tomorrow's free voice lines ({e})"
+    if not (folder / "made.json").exists():      # (a finished story is not rendered again on every run)
+        try:
+            log.info("▶ pictures, voices and video for %s", folder.name)
+            make.make(folder, settings)
+        except VoiceLimit as e:
+            return f"{series}: {folder.name} is waiting for tomorrow's free voice lines ({e})"
+        (folder / "made.json").write_text(json.dumps({"made_at": datetime.now(P.IST).isoformat()}), encoding="utf-8")
 
     if not upload:
         return f"{series}: {folder.name} is made ({folder / 'video.mp4'}); not uploaded"
+    if settings.get("pipeline", {}).get("review_first", True) and not (folder / "approved.json").exists():
+        # Watch first: nothing goes to YouTube until you have seen it and approved it.
+        if interactive:
+            _open(folder / "video.mp4")
+            _open(folder / "thumbnail.jpg")
+        return (f"{series}: {folder.name} is made and waiting for your approval. Watch {folder / 'video.mp4'} "
+                f"and, if you are happy, run story_approve_{series}.bat to schedule it on YouTube")
     record = P.publish(folder, settings, interactive)
     if record is None:
         return f"{series}: {folder.name} is made, but this series' YouTube channel is not signed in yet"
     return (f"{series}: {folder.name} uploaded https://youtu.be/{record['video_id']} -- public "
             f"{datetime.fromisoformat(record['slot']):%a %d %b %H:%M} IST")
+
+
+def _open(path: Path) -> None:
+    import os
+
+    if path.exists() and hasattr(os, "startfile"):
+        try:
+            os.startfile(path)  # noqa: S606 -- the user's own video, in their own player
+        except OSError:
+            pass
+
+
+def approve(series: str, interactive: bool = True) -> str:
+    """Marks the series' finished, unapproved story as approved and uploads it into the next slot."""
+    from autopilot import sync
+
+    settings = writer.load_settings()
+    sync.pull()
+    try:
+        ready = [r for r in _records(settings, series) if not r["published"] and (r["folder"] / "made.json").exists()]
+        if not ready:
+            return f"{series}: no finished story is waiting for approval"
+        folder = ready[0]["folder"]
+        (folder / "approved.json").write_text(json.dumps({"approved_at": datetime.now(P.IST).isoformat()}), encoding="utf-8")
+        record = P.publish(folder, settings, interactive)
+        if record is None:
+            return f"{series}: {folder.name} is approved, but this series' YouTube channel is not signed in yet"
+        return (f"{series}: {folder.name} uploaded https://youtu.be/{record['video_id']} -- public "
+                f"{datetime.fromisoformat(record['slot']):%a %d %b %H:%M} IST (private until then)")
+    finally:
+        sync.push(pictures=False)
 
 
 def status() -> list[str]:
@@ -112,7 +154,9 @@ def status() -> list[str]:
             if r["published"]:
                 state = f"scheduled {datetime.fromisoformat(r['published']['slot']):%a %d %b %H:%M}  https://youtu.be/{r['published']['video_id']}"
             else:
-                state = "video made, not uploaded" if r["video"] else "in progress"
+                made, ok = (r["folder"] / "made.json").exists(), (r["folder"] / "approved.json").exists()
+                state = ("approved, uploads on the next run" if made and ok else
+                         "MADE: waiting for your approval" if made else "in progress")
             lines.append(f"{series:7} {r['folder'].name:22} {title}  --  {state}")
     return lines or ["no pipeline stories yet"]
 
@@ -126,12 +170,16 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--no-upload", action="store_true")
     r.add_argument("--scheduled", action="store_true", help="unattended: never open a browser")
     sub.add_parser("status")
+    ok = sub.add_parser("approve")
+    ok.add_argument("--series", choices=["adults", "kids"], required=True)
     s = sub.add_parser("signin")
     s.add_argument("--series", choices=["adults", "kids"], required=True)
     args = ap.parse_args(argv)
     try:
         if args.cmd == "run":
             log.info("✅ %s", run(args.series, upload=not args.no_upload, interactive=not args.scheduled))
+        elif args.cmd == "approve":
+            log.info("✅ %s", approve(args.series))
         elif args.cmd == "status":
             for line in status():
                 log.info("%s", line)

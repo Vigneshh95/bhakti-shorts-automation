@@ -23,6 +23,7 @@ releases_per_week = 2                 # per series (schedule to be set with the 
 # The pipeline (python -m stories run): keeps this many finished stories scheduled ahead per series.
 [pipeline]
 stories_ahead = 2
+review_first = true                   # a finished story waits until you have watched it and run story_approve_<series>.bat
 
 [topics]
 kids = [
