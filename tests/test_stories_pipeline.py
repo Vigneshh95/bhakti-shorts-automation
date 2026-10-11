@@ -52,3 +52,16 @@ def test_thumbnail_design_is_checked_and_its_boxes_made_usable():
     assert any("at most" in e for e in T.check(dict(good, line2="மிக மிக நீளமான ஒரு வரி இது"), script))
     left, top, right, bottom = T._box([0.9, 0.9, 0.95, 0.95], 0.4, 0.5)    # a tiny box in a corner
     assert right - left >= 0.4 - 1e-9 and bottom - top >= 0.5 - 1e-9 and right <= 1 and bottom <= 1
+
+
+def test_kids_shorts_go_to_the_kids_channel_and_are_declared_made_for_kids(monkeypatch, tmp_path):
+    from autopilot import youtube
+    from autopilot.settings import load_settings
+
+    kids, main = load_settings(series="kids"), load_settings(series="murugan")
+    assert kids["youtube"]["made_for_kids"] is True and kids["youtube"]["channel_id"].startswith("UC")
+    assert youtube.channel_config(kids)["token_file"].name == "kids_token.json"
+    assert youtube.channel_config(main)["token_file"].name != "kids_token.json"
+    assert youtube.channel_config(kids)["playlist_id"] == ""            # the main channel's playlist is not used
+    monkeypatch.setenv("YT_TOKEN_FILE_KIDS", str(tmp_path / "cloud_kids.json"))
+    assert youtube.channel_config(kids)["token_file"] == tmp_path / "cloud_kids.json"

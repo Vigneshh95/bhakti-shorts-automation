@@ -200,7 +200,7 @@ def _fake_world(monkeypatch, settings, signed_in=True):
         return type("R", (), {"output": output})
 
     monkeypatch.setattr(shorts.pipeline, "make_short", fake_make)
-    monkeypatch.setattr(youtube, "preflight", lambda interactive: signed_in or interactive)
+    monkeypatch.setattr(youtube, "preflight", lambda interactive, settings=None: signed_in or interactive)
     monkeypatch.setattr(youtube, "upload", lambda v, sc, s, when, interactive: state["uploads"].append(when) or "VID123")
     monkeypatch.setattr(run_mod, "notify", lambda title, body: state["notes"].append(title))
     monkeypatch.setattr(run_mod, "ask", lambda title, body, yes_command="", workdir="": state["asks"].append(yes_command))
