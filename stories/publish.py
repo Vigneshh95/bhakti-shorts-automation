@@ -29,6 +29,31 @@ def next_slot(series_cfg: dict, taken: list[str], now: datetime | None = None) -
     raise RuntimeError("no free release slot in the next 60 days")
 
 
+def channel(series: str, cfg: dict) -> dict:
+    """Where this series uploads: the main channel (config.ini), or the series' own channel when
+    [youtube.<series>] token_file names its sign-in file. On the cloud machine the file's place
+    comes from YT_TOKEN_FILE_<SERIES>."""
+    import os
+
+    from shorts.config import ROOT
+
+    ch = dict(Y.channel_config())
+    if cfg.get("token_file"):
+        ch["token_file"] = Path(os.environ.get(f"YT_TOKEN_FILE_{series.upper()}") or ROOT / cfg["token_file"])
+    return ch
+
+
+def sign_in(series: str, settings: dict) -> str:
+    """Opens the browser to sign in to the series' channel and saves its sign-in file."""
+    from googleapiclient.discovery import build
+
+    ch = channel(series, settings["youtube"][series])
+    ch["token_file"].unlink(missing_ok=True) if ch["token_file"].name != Y.channel_config()["token_file"].name else None
+    yt = build("youtube", "v3", credentials=Y._credentials(ch, True), cache_discovery=False)
+    me = yt.channels().list(part="snippet", mine=True).execute()["items"][0]
+    return f"signed in to the channel \"{me['snippet']['title']}\" for the {series} stories ({ch['token_file'].name})"
+
+
 def description(script: dict, footer: str) -> str:
     parts = [script["youtube_description"], "",
              f"{script['source_name_ta']}: \"{script['source_line_ta']}\" — {script['source_meaning_ta']}", "",
@@ -39,9 +64,10 @@ def description(script: dict, footer: str) -> str:
     return "\n".join(parts)[:4900]
 
 
-def publish(folder: Path, settings: dict, interactive: bool = True) -> dict:
+def publish(folder: Path, settings: dict, interactive: bool = True) -> dict | None:
     """Uploads <folder>/video.mp4. Returns the record also saved as <folder>/published.json; a
-    story that already has that file is not uploaded again."""
+    story that already has that file is not uploaded again. None = the series has its own channel
+    and nobody has signed in to it yet (the story stays made and is uploaded on a later run)."""
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
@@ -51,9 +77,14 @@ def publish(folder: Path, settings: dict, interactive: bool = True) -> dict:
     script = json.loads((folder / "script.json").read_text(encoding="utf-8"))
     series = script["series"]
     cfg = settings["youtube"][series]
-    taken = [json.loads(p.read_text(encoding="utf-8")).get("slot", "") for p in folder.parent.glob("*/published.json")]
+    ch = channel(series, cfg)
+    if cfg.get("token_file") and not ch["token_file"].exists():
+        log.warning("  the %s stories have their own YouTube channel, and it is not signed in yet (%s is missing)",
+                    series, ch["token_file"].name)
+        return None
+    taken = [json.loads(p.read_text(encoding="utf-8")).get("slot", "") for p in folder.parent.glob(f"{series}-*/published.json")]
     slot = next_slot(cfg, taken)
-    yt = build("youtube", "v3", credentials=Y._credentials(Y.channel_config(), interactive), cache_discovery=False)
+    yt = build("youtube", "v3", credentials=Y._credentials(ch, interactive), cache_discovery=False)
     body = {"snippet": {"title": script["youtube_title"][:100], "description": description(script, cfg.get("footer", "")),
                         "tags": script.get("tags", [])[:30], "categoryId": "22", "defaultLanguage": "ta",
                         "defaultAudioLanguage": "ta"},

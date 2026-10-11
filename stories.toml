@@ -20,6 +20,10 @@ adults_scenes = [18, 22]              # the grown-ups' stories run longer: about
 releases_per_week = 2                 # per series (schedule to be set with the cloud runs)
 
 # Problems to tell stories about, in turn (add your own lines).
+# The pipeline (python -m stories run): keeps this many finished stories scheduled ahead per series.
+[pipeline]
+stories_ahead = 2
+
 [topics]
 kids = [
   "telling a lie to escape a scolding",
@@ -165,7 +169,8 @@ pace = 0.86
 # (YouTube then turns off comments and personalised ads on those videos), no for the adults series.
 [youtube.kids]
 made_for_kids = true
-playlist_id = "PLF70-DN_o7Uc"         # குழந்தைகளுக்கான குட்டி முருகன் கதைகள் | Kutti Murugan Stories for Kids
+token_file = "kids_token.json"        # the kids' stories go to their OWN channel: sign in once with story_kids_sign_in.bat
+playlist_id = ""                      # a playlist on the kids' channel (optional)
 days = ["sun", "thu"]                 # two releases a week (India time)
 time = "10:00"                        # a weekend / holiday-morning slot, when children watch with a parent
 footer = "🙏 குட்டி முருகன் கதைகள் — BrahmaNadagam. Subscribe செய்யுங்கள்."

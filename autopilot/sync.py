@@ -87,6 +87,18 @@ def _merge_state() -> None:
                 shutil.copyfile(src, dst)
         else:
             _merge_json_dict(ROOT / rel, CLONE / rel)
+    # the story pipeline's records (script + release slot of each story: small files; pictures and
+    # videos stay where they were made), so laptop and cloud never tell the same topic or take the
+    # same release slot twice
+    for side_a, side_b in ((CLONE, ROOT), (ROOT, CLONE)):
+        for series in ("adults", "kids"):
+            for record in (side_a / "story_episodes").glob(f"{series}-*/*.json"):
+                if record.name in ("script.json", "published.json"):
+                    target = side_b / record.relative_to(side_a)
+                    if not target.exists() or (record.name == "script.json" and record.stat().st_mtime > target.stat().st_mtime
+                                               and record.read_bytes() != target.read_bytes()):
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(record, target)
     # each day's reviewed script: whichever side wrote it first is used by the other
     for side_a, side_b in ((CLONE, ROOT), (ROOT, CLONE)):
         for script in (side_a / "episodes").glob("*/*/script.json"):

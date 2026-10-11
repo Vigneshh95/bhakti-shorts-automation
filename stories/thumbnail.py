@@ -82,7 +82,8 @@ def check(design: dict, script: dict) -> list[str]:
         if not 1 <= int(design.get(key, 0)) <= len(scenes):
             problems.append(f"{key} must be a picture number from 1 to {len(scenes)}")
     if not problems:
-        if "murugan" in scenes[design["story_scene"] - 1]["characters"]:
+        without = [sc for sc in scenes if sc["characters"] and "murugan" not in sc["characters"]]
+        if without and "murugan" in scenes[design["story_scene"] - 1]["characters"]:
             problems.append("story_scene must be a picture WITHOUT Murugan (the human moment)")
         if "murugan" not in scenes[design["murugan_scene"] - 1]["characters"]:
             problems.append("murugan_scene must be a picture with baby Murugan in it")

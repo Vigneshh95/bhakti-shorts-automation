@@ -140,8 +140,11 @@ class Actor:
                       f"reading. Say only this line, nothing else:\n{text}")
             # A take far longer than the line needs is a ramble (seen: 26 s for two words): never kept.
             # Each new try costs one of the day's free requests, so two tries, then the run stops.
-            for attempt in range(2):
-                pcm = self._pcm(prompt, role["voice"])
+            # The retries use the plain "Say <how>: <line>" form, which the weaker models follow better
+            # on very short lines.
+            plain = f"Say this Tamil line as {role['who'].split(':')[0]} would, {tone[0].lower()}{tone[1:]}: {text}"
+            for attempt in range(3):
+                pcm = self._pcm(prompt if attempt == 0 else plain, role["voice"])
                 if len(pcm) / 48000 <= too_long(text):
                     break
                 log.info("  a rambling take was thrown away (%.0f s for %d letters)", len(pcm) / 48000, len(text))
