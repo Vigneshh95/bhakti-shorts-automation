@@ -177,6 +177,7 @@ pace = 0.86
 # (YouTube then turns off comments and personalised ads on those videos), no for the adults series.
 [youtube.kids]
 made_for_kids = true
+channel_id = "UCfKL9kT6cpKr4E9puFXAJMQ"   # குட்டி முருகன் கதைகள் (uploads are refused on any other channel)
 token_file = "kids_token.json"        # the kids' stories go to their OWN channel: sign in once with story_kids_sign_in.bat
 playlist_id = ""                      # a playlist on the kids' channel (optional)
 days = ["sun", "thu"]                 # two releases a week (India time)
@@ -184,6 +185,7 @@ time = "10:00"                        # a weekend / holiday-morning slot, when c
 footer = "🙏 குட்டி முருகன் கதைகள் — BrahmaNadagam. Subscribe செய்யுங்கள்."
 [youtube.adults]
 made_for_kids = false
+channel_id = "UCZcyzGOG0qFhVBlemfhs_Sw"   # BrahmaNadagam
 playlist_id = ""
 days = ["wed", "sat"]                 # two releases a week (India time)
 time = "19:00"                        # evening, when most viewers are on YouTube

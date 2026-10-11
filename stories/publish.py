@@ -85,6 +85,11 @@ def publish(folder: Path, settings: dict, interactive: bool = True) -> dict | No
     taken = [json.loads(p.read_text(encoding="utf-8")).get("slot", "") for p in folder.parent.glob(f"{series}-*/published.json")]
     slot = next_slot(cfg, taken)
     yt = build("youtube", "v3", credentials=Y._credentials(ch, interactive), cache_discovery=False)
+    if cfg.get("channel_id"):   # never a kids' story on the main channel, or the other way round
+        mine = yt.channels().list(part="snippet", mine=True).execute()["items"][0]
+        if mine["id"] != cfg["channel_id"]:
+            raise RuntimeError(f"the {series} stories belong on another channel, but this sign-in is for "
+                               f"\"{mine['snippet']['title']}\": nothing was uploaded (sign in again and choose the right channel)")
     body = {"snippet": {"title": script["youtube_title"][:100], "description": description(script, cfg.get("footer", "")),
                         "tags": script.get("tags", [])[:30], "categoryId": "22", "defaultLanguage": "ta",
                         "defaultAudioLanguage": "ta"},
