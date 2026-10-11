@@ -67,10 +67,15 @@ def directions(script: dict, ask) -> bool:
     return True
 
 
-def _request(model: str, prompt: str, voice: str, key: str) -> bytes:
+def _request(model: str, prompt: str, voice, key: str) -> bytes:
+    """voice: one voice name, or {speaker name in the prompt: voice name} for a two-speaker scene."""
+    if isinstance(voice, dict) and len(voice) > 1:
+        speech = {"multiSpeakerVoiceConfig": {"speakerVoiceConfigs": [
+            {"speaker": name, "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": v}}} for name, v in voice.items()]}}
+    else:
+        speech = {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": next(iter(voice.values())) if isinstance(voice, dict) else voice}}}
     body = {"contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseModalities": ["AUDIO"],
-                                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}}}
+            "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": speech}}
     req = urllib.request.Request(URL.format(model=model), data=json.dumps(body).encode(),
                                  headers={"x-goog-api-key": key, "Content-Type": "application/json"})
     data = json.load(urllib.request.urlopen(req, timeout=180))
@@ -97,7 +102,7 @@ class Actor:
         self.cache, self.ffmpeg = cache, ffmpeg
         self.last = 0.0
 
-    def _pcm(self, prompt: str, voice: str) -> bytes:
+    def _pcm(self, prompt: str, voice) -> bytes:
         while self.models:
             model, key = self.models[0]
             for attempt in range(4):
@@ -125,6 +130,46 @@ class Actor:
                     break
             self.models.pop(0)
         raise VoiceLimit("the free speech models have reached today's limit; run again later (finished lines are kept)")
+
+    def speak_scene(self, chunk: list[dict], names: dict[str, str], roles: dict[str, dict]) -> LineAudio:
+        """One piece of a scene (see chunks()) in one request; word timings from the aligner."""
+        from stories import align
+
+        text = " ".join(l["text"] for l in chunk)
+        voices = {names[sp]: roles[sp]["voice"] for sp in sorted({l["speaker"] for l in chunk}, key=lambda sp: names[sp])}
+        signature = [VERSION, "scene", [(names[l["speaker"]], l["text"], l["tone"]) for l in chunk], voices,
+                     {names[sp]: roles[sp]["who"] for sp in {l["speaker"] for l in chunk}}]
+        out, hit = self.cache.lookup("story_actor", self.cache.key("story_actor", signature), ".wav")
+        timing = out.with_suffix(".json")
+        if not (hit and timing.exists()):
+            prompt = scene_prompt(chunk, names, roles)
+            limit = too_long(text) + 0.8 * len(chunk)        # room for the pauses between speakers
+            for attempt in range(3):
+                pcm = self._pcm(prompt, voices)
+                if 0.03 * len(text) <= len(pcm) / 48000 <= limit:
+                    break
+                log.info("  a bad take was thrown away (%.0f s for %d letters)", len(pcm) / 48000, len(text))
+            else:
+                raise VoiceLimit(f"no clean take for: {text[:40]}… -- run again later")
+            raw = out.with_suffix(".raw.wav")
+            with wave.open(str(raw), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(24000)
+                w.writeframes(pcm)
+            trim = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.06,areverse,"
+                    "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.12,areverse,")
+            tmp = out.with_suffix(".tmp.wav")
+            subprocess.run([str(self.ffmpeg), "-y", "-loglevel", "error", "-i", str(raw), "-af",
+                            f"{trim}highpass=f=70,aresample=24000", "-ac", "1", str(tmp)], check=True)
+            raw.unlink(missing_ok=True)
+            times, score = align.word_times(tmp, text.split())
+            tmp.replace(out)
+            timing.write_text(json.dumps({"words": times, "score": score}), encoding="utf-8")
+        data = json.loads(timing.read_text(encoding="utf-8"))
+        info = sf.info(out)
+        words = [Word(w, float(a), float(b)) for w, (a, b) in zip(text.split(), data["words"])]
+        return LineAudio(text, out, info.samplerate, info.duration, words)
 
     def made(self, text: str, role: dict, tone: str) -> bool:
         """Was this line already spoken (on an earlier run)?"""
@@ -168,6 +213,31 @@ class Actor:
             raw.unlink(missing_ok=True)
         info = sf.info(out)
         return LineAudio(text, out, info.samplerate, info.duration, _spread(text, info.duration))
+
+
+def chunks(lines: list[dict], names: dict[str, str], max_chars: int = 420) -> list[list[dict]]:
+    """A scene's lines in pieces that one speech request can perform: at most two different
+    speakers (the speech models' limit) and not too long. names: speaker id -> name in the prompt."""
+    out: list[list[dict]] = []
+    for line in lines:
+        cur = out[-1] if out else None
+        if (cur is None or len({names[l["speaker"]] for l in cur} | {names[line["speaker"]]}) > 2
+                or sum(len(l["text"]) for l in cur) + len(line["text"]) > max_chars):
+            out.append([line])
+        else:
+            cur.append(line)
+    return out
+
+
+def scene_prompt(chunk: list[dict], names: dict[str, str], roles: dict[str, dict]) -> str:
+    who = sorted({l["speaker"] for l in chunk}, key=lambda sp: names[sp])
+    cast = " ".join(f"{names[sp]} is {roles[sp]['who']}." for sp in who)
+    how = "\n".join(f"{i}. {names[l['speaker']]}: {l['tone']}" for i, l in enumerate(chunk, 1))
+    text = "\n".join(f"{names[l['speaker']]}: {l['text']}" for l in chunk)
+    return (f"Perform this moment of a Tamil audio drama. {cast}\n"
+            f"How each line is said, in order (directions for the actors, never spoken aloud):\n{how}\n"
+            f"Speak in natural everyday Tamil exactly as written, like real people talking, with a natural pause "
+            f"when the speaker changes. Say only the lines below, once, and then stop.\n\n{text}")
 
 
 def too_long(text: str) -> float:

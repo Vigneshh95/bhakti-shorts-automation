@@ -157,6 +157,30 @@ def _shape(line: LineAudio, style: dict, ffmpeg: Path, cache: Cache) -> LineAudi
     return LineAudio(line.text, out, line.sample_rate, duration, words)
 
 
+def _cast_voices(script: dict, voices: dict, home: set[str]) -> tuple[dict[str, dict], dict[str, str]]:
+    """For every speaker of the story: its voice settings, and a plain name for the speech prompt.
+    Two characters never share a voice: the second of a kind takes the next of that kind's "alts"."""
+    tale = {t["id"]: t for t in script.get("tale_cast", [])}
+    roles, names, taken = {}, {}, set()
+    order = list(dict.fromkeys(l["speaker"] for sc in script["scenes"] for l in sc["lines"]))
+    for n, sp in enumerate(order):
+        role = dict(S.voice_for(sp, script.get("tale_cast"), voices, home))
+        for alt in [role["voice"], *role.get("alts", [])]:
+            if alt not in taken:
+                role["voice"] = alt
+                break
+        taken.add(role["voice"])
+        roles[sp] = role
+        label = {"narrator": "Narrator", "murugan": "Murugan", "paatti": "Paatti", "ilango": "Ilango", "kuzhali": "Kuzhali"}.get(sp)
+        if not label:
+            raw = tale[sp]["name"] if sp in tale else script.get("person_look", "Person").split(",")[0]
+            label = "".join(ch for ch in raw.split()[0] if ch.isalpha()) or f"Speaker{n + 1}"
+        while label in names.values():
+            label += "2"
+        names[sp] = label
+    return roles, names
+
+
 def _pad(line: LineAudio, seconds: float, cache: Cache) -> LineAudio:
     """The same line followed by `seconds` of silence (so the pause before the next line is longer)."""
     out, hit = cache.lookup("story_pause", cache.key("story_pause", line.wav_path, round(seconds, 2)), ".wav")
@@ -212,7 +236,19 @@ def make(folder: Path, settings: dict) -> Path:
         actor = V.Actor(settings, cache, ff)
         total = sum(len(sc["lines"]) for sc in script["scenes"])
         done = 0
-        for i, scene in enumerate(script["scenes"]):
+        by_scene = acting.get("per", "turn") == "scene"
+        if by_scene:
+            # A whole scene in one or two requests (two speakers at a time): about half the requests
+            # of a story, and the people answer each other in one breath.
+            roles, names = _cast_voices(script, acting["voices"], home)
+            for i, scene in enumerate(script["scenes"]):
+                for chunk in V.chunks(scene["lines"], names):
+                    spoken.append(actor.speak_scene(chunk, names, roles))
+                    scene_of.append(i)
+                    speakers.append(chunk[-1]["speaker"] if len({l["speaker"] for l in chunk}) == 1 else "several")
+                    done += len(chunk)
+                log.info("  scene %d of %d spoken (%d of %d lines)", i + 1, len(script["scenes"]), done, total)
+        for i, scene in enumerate([] if by_scene else script["scenes"]):
             # One request speaks a character's consecutive lines in the scene (the free allowance is
             # counted in requests, and a thought spoken in one breath sounds more natural anyway).
             turns: list[list[dict]] = []

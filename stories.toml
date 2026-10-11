@@ -57,6 +57,7 @@ adults = [
 enabled = true
 models = ["gemini-3.1-flash-tts-preview", "gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]
 requests_per_minute = 8
+per = "turn"                          # "scene" = a whole scene in one or two requests (half the requests; being tested)
 
 [acting.voices.narrator]
 voice = "Sulafat"
@@ -79,31 +80,38 @@ semitones = 2.5
 formant = "shifted"
 [acting.voices.paatti]
 voice = "Gacrux"
+alts = ["Vindemiatrix"]
 who = "an old Tamil grandmother, slow, kind and a little amused"
 semitones = -1.0
 [acting.voices.adult]
 voice = "Charon"
+alts = ["Iapetus", "Rasalgethi", "Algieba", "Schedar"]
 who = "a grown Tamil man in a story of old times"
 semitones = 0.0
 [acting.voices.home_man]
 voice = "Orus"
+alts = ["Puck", "Fenrir"]
 who = "a Tamil man in his thirties at home, talking fast in everyday spoken Tamil the way husbands really talk"
 semitones = 0.0
 [acting.voices.home_woman]
 voice = "Aoede"
+alts = ["Autonoe", "Achernar"]
 who = "a Tamil woman around thirty at home, talking in everyday spoken Tamil the way wives really talk"
 semitones = 0.0
 [acting.voices.tale_child]
 voice = "Leda"
+alts = ["Zephyr", "Laomedeia"]
 who = "a village child in a story of old times"
 semitones = 3.0
 formant = "shifted"
 [acting.voices.tale_woman]
 voice = "Kore"
+alts = ["Despina", "Erinome", "Callirrhoe"]
 who = "a grown Tamil woman in a story of old times"
 semitones = 0.0
 [acting.voices.old_man]
 voice = "Algenib"
+alts = ["Sadaltager", "Umbriel"]
 who = "an old Tamil man with a worn, gentle voice"
 semitones = -1.0
 
