@@ -235,7 +235,7 @@ def make(folder: Path, settings: dict) -> Path:
             (folder / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
         actor = V.Actor(settings, cache, ff)
         total = sum(len(sc["lines"]) for sc in script["scenes"])
-        done = 0
+        done = missing = 0
         by_scene = acting.get("per", "turn") == "scene"
         if by_scene:
             # A whole scene in one or two requests (two speakers at a time): about half the requests
@@ -243,7 +243,13 @@ def make(folder: Path, settings: dict) -> Path:
             roles, names = _cast_voices(script, acting["voices"], home)
             for i, scene in enumerate(script["scenes"]):
                 for chunk in V.chunks(scene["lines"], names):
-                    spoken.append(actor.speak_scene(chunk, names, roles))
+                    try:
+                        spoken.append(actor.speak_scene(chunk, names, roles))
+                    except V.VoiceLimit:
+                        if not actor.models:
+                            raise
+                        missing += 1          # no clean take of this piece today: the others are still made
+                        continue
                     scene_of.append(i)
                     speakers.append(chunk[-1]["speaker"] if len({l["speaker"] for l in chunk}) == 1 else "several")
                     done += len(chunk)
@@ -267,11 +273,19 @@ def make(folder: Path, settings: dict) -> Path:
                 else:
                     parts = [(turn[0]["text"], turn[0]["tone"])]
                 for text, tone in parts:
-                    spoken.append(actor.speak(text, role, tone))
+                    try:
+                        spoken.append(actor.speak(text, role, tone))
+                    except V.VoiceLimit:
+                        if not actor.models:
+                            raise
+                        missing += 1          # no clean take of this line today: the others are still made
+                        continue
                     scene_of.append(i)
                     speakers.append(turn[0]["speaker"])
                 done += len(turn)
             log.info("  scene %d of %d spoken (%d of %d lines)", i + 1, len(script["scenes"]), done, total)
+        if missing:
+            raise V.VoiceLimit(f"{missing} line(s) still need a clean take")
         voice = None
     else:
         voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))

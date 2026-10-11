@@ -173,11 +173,11 @@ class Actor:
 
     def made(self, text: str, role: dict, tone: str) -> bool:
         """Was this line already spoken (on an earlier run)?"""
-        return self.cache.lookup("story_actor", self.cache.key("story_actor", [VERSION, text, role, tone]), ".wav")[1]
+        return self.cache.lookup("story_actor", self.cache.key("story_actor", [VERSION, text, _sound(role), tone]), ".wav")[1]
 
     def speak(self, text: str, role: dict, tone: str) -> LineAudio:
         """role: {"voice", "who", optional "semitones", "pace"}."""
-        signature = [VERSION, text, role, tone]
+        signature = [VERSION, text, _sound(role), tone]
         out, hit = self.cache.lookup("story_actor", self.cache.key("story_actor", signature), ".wav")
         if not hit:
             prompt = (f"You are a voice actor in a Tamil audio drama, playing {role['who']}. Direction: {tone} "
@@ -238,6 +238,13 @@ def scene_prompt(chunk: list[dict], names: dict[str, str], roles: dict[str, dict
             f"How each line is said, in order (directions for the actors, never spoken aloud):\n{how}\n"
             f"Speak in natural everyday Tamil exactly as written, like real people talking, with a natural pause "
             f"when the speaker changes. Say only the lines below, once, and then stop.\n\n{text}")
+
+
+def _sound(role: dict) -> dict:
+    """What makes a line sound the way it does. Only this identifies a spoken line: a setting that
+    doesn't change the sound (the list of spare voices) must not make finished lines be spoken again
+    (2026-10-11: adding "alts" did, and used up a day's free lines)."""
+    return {k: v for k, v in role.items() if k != "alts"}
 
 
 def too_long(text: str) -> float:
