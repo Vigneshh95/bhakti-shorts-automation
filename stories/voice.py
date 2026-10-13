@@ -182,6 +182,20 @@ class Actor:
         """role: {"voice", "who", optional "semitones", "pace"}."""
         signature = [VERSION, text, _sound(role), tone]
         out, hit = self.cache.lookup("story_actor", self.cache.key("story_actor", signature), ".wav")
+        checked = out.with_suffix(".checked")
+        if hit and not checked.exists():
+            # spoken before every take was checked for instructions read aloud (2026-10-13): check it now
+            pre = f"You are a voice actor in a Tamil audio drama, playing {role['who']}. Direction: {tone} Say only this line:"
+            span = line_span(out, pre, text)
+            if span is None:
+                out.unlink()
+                hit = False
+            elif span[0] > 0:
+                tmp = out.with_suffix(".tmp.wav")
+                subprocess.run([str(self.ffmpeg), "-y", "-loglevel", "error", "-ss", f"{span[0]:.2f}", "-to", f"{span[1]:.2f}",
+                                "-i", str(out), "-af", "afade=t=in:d=0.05", str(tmp)], check=True)
+                tmp.replace(out)
+                out.with_suffix(".words.json").unlink(missing_ok=True)
         if not hit:
             prompt = (f"You are a voice actor in a Tamil audio drama, playing {role['who']}. Direction: {tone} "
                       f"Speak in natural everyday Tamil exactly as written, like a real person and not like someone "
@@ -218,6 +232,7 @@ class Actor:
                             "-i", str(raw), "-af", f"{trim}{shape}highpass=f=70,aresample=24000", "-ac", "1", str(tmp)], check=True)
             tmp.replace(out)
             raw.unlink(missing_ok=True)
+        checked.touch()
         return LineAudio(text, out, sf.info(out).samplerate, sf.info(out).duration, timed_words(out, text))
 
 
