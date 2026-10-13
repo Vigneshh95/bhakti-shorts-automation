@@ -68,11 +68,30 @@ def run(series: str, upload: bool = True, interactive: bool = True) -> str:
         sync.push(pictures=False)
 
 
+def _here() -> str:
+    import os
+
+    return "cloud" if os.environ.get("GITHUB_ACTIONS") else "laptop"
+
+
+def _maker(folder: Path) -> str | None:
+    try:
+        return json.loads((folder / "maker.json").read_text(encoding="utf-8")).get("where")
+    except (OSError, ValueError):
+        return None
+
+
 def _run(series: str, upload: bool, interactive: bool, settings: dict, make, VoiceLimit) -> str:
     records = _records(settings, series)
     open_ones = [r for r in records if not r["published"]]
-    if open_ones:
-        current = open_ones[0]
+    mine = [r for r in open_ones if _maker(r["folder"]) in (None, _here())]
+    if open_ones and not mine:
+        # being made on the other machine (its pictures and voice lines are there): leave it alone,
+        # and don't start another story of this series beside it
+        other = open_ones[0]["folder"]
+        return f"{series}: {other.name} is being made on the {_maker(other)}; nothing to do here"
+    if mine:
+        current = mine[0]
         folder = current["folder"]
     else:
         waiting = [r for r in records if r["published"] and datetime.fromisoformat(r["published"]["slot"]) > datetime.now(P.IST)]
@@ -83,6 +102,8 @@ def _run(series: str, upload: bool, interactive: bool, settings: dict, make, Voi
         folder.mkdir(parents=True, exist_ok=True)
         current = {"folder": folder, "script": None, "video": False}
 
+    if not (folder / "maker.json").exists():
+        (folder / "maker.json").write_text(json.dumps({"where": _here()}), encoding="utf-8")
     if not (folder / "script.json").exists():
         topic = _next_topic(settings, series, records)
         log.info("▶ writing a new %s story: %s", series, topic)
@@ -155,8 +176,9 @@ def status() -> list[str]:
                 state = f"scheduled {datetime.fromisoformat(r['published']['slot']):%a %d %b %H:%M}  https://youtu.be/{r['published']['video_id']}"
             else:
                 made, ok = (r["folder"] / "made.json").exists(), (r["folder"] / "approved.json").exists()
+                where = f" (on the {_maker(r['folder'])})" if _maker(r["folder"]) else ""
                 state = ("approved, uploads on the next run" if made and ok else
-                         "MADE: waiting for your approval" if made else "in progress")
+                         "MADE: waiting for your approval" if made else f"in progress{where}")
             lines.append(f"{series:7} {r['folder'].name:22} {title}  --  {state}")
     return lines or ["no pipeline stories yet"]
 
