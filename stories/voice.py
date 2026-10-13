@@ -144,24 +144,27 @@ class Actor:
         if not (hit and timing.exists()):
             prompt = scene_prompt(chunk, names, roles)
             limit = too_long(text) + 0.8 * len(chunk)        # room for the pauses between speakers
+            raw = out.with_suffix(".raw.wav")
+            preamble = prompt[:prompt.rindex(chr(10) * 2)]    # the directions: cut off if the voice reads them aloud
             for attempt in range(3):
                 pcm = self._pcm(prompt, voices)
-                if 0.03 * len(text) <= len(pcm) / 48000 <= limit:
+                with wave.open(str(raw), "wb") as w:
+                    w.setnchannels(1)
+                    w.setsampwidth(2)
+                    w.setframerate(24000)
+                    w.writeframes(pcm)
+                span = line_span(raw, preamble, text) if len(pcm) / 48000 <= limit + 60 else None
+                if span and span[1] - span[0] <= limit:
                     break
                 log.info("  a bad take was thrown away (%.0f s for %d letters)", len(pcm) / 48000, len(text))
             else:
+                raw.unlink(missing_ok=True)
                 raise VoiceLimit(f"no clean take for: {text[:40]}… -- run again later")
-            raw = out.with_suffix(".raw.wav")
-            with wave.open(str(raw), "wb") as w:
-                w.setnchannels(1)
-                w.setsampwidth(2)
-                w.setframerate(24000)
-                w.writeframes(pcm)
             trim = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.06,areverse,"
                     "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.12,areverse,")
             tmp = out.with_suffix(".tmp.wav")
-            subprocess.run([str(self.ffmpeg), "-y", "-loglevel", "error", "-i", str(raw), "-af",
-                            f"{trim}highpass=f=70,aresample=24000", "-ac", "1", str(tmp)], check=True)
+            subprocess.run([str(self.ffmpeg), "-y", "-loglevel", "error", "-ss", f"{span[0]:.2f}", "-to", f"{span[1]:.2f}",
+                            "-i", str(raw), "-af", f"{trim}highpass=f=70,aresample=24000", "-ac", "1", str(tmp)], check=True)
             raw.unlink(missing_ok=True)
             times, score = align.word_times(tmp, text.split())
             tmp.replace(out)
@@ -183,36 +186,39 @@ class Actor:
             prompt = (f"You are a voice actor in a Tamil audio drama, playing {role['who']}. Direction: {tone} "
                       f"Speak in natural everyday Tamil exactly as written, like a real person and not like someone "
                       f"reading. Say only this line, nothing else:\n{text}")
-            # A take far longer than the line needs is a ramble (seen: 26 s for two words): never kept.
-            # Each new try costs one of the day's free requests, so two tries, then the run stops.
-            # The retries use the plain "Say <how>: <line>" form, which the weaker models follow better
-            # on very short lines.
+            # The models sometimes say more than the line: they read their English directions aloud
+            # first (seen: 30 s of instructions before a 6 s line), or ramble. Every take is measured
+            # against the text: just the line is kept, cut out of the take; a take in which the line
+            # can't be found cleanly is thrown away and tried again in the plain "Say <how>: <line>"
+            # form. Each try costs one of the day's free requests: three tries, then the run moves on.
             plain = f"Say this Tamil line as {role['who'].split(':')[0]} would, {tone[0].lower()}{tone[1:]}: {text}"
-            for attempt in range(3):
-                pcm = self._pcm(prompt if attempt == 0 else plain, role["voice"])
-                if len(pcm) / 48000 <= too_long(text):
-                    break
-                log.info("  a rambling take was thrown away (%.0f s for %d letters)", len(pcm) / 48000, len(text))
-            else:
-                raise VoiceLimit(f"no clean take for the line: {text[:40]}… -- run again later")
             raw = out.with_suffix(".raw.wav")
-            with wave.open(str(raw), "wb") as w:
-                w.setnchannels(1)
-                w.setsampwidth(2)
-                w.setframerate(24000)
-                w.writeframes(pcm)
+            for attempt in range(3):
+                used = prompt if attempt == 0 else plain
+                pcm = self._pcm(used, role["voice"])
+                with wave.open(str(raw), "wb") as w:
+                    w.setnchannels(1)
+                    w.setsampwidth(2)
+                    w.setframerate(24000)
+                    w.writeframes(pcm)
+                span = line_span(raw, used[:-len(text)], text)
+                if span:
+                    break
+                log.info("  a bad take was thrown away (%.0f s for %d letters)", len(pcm) / 48000, len(text))
+            else:
+                raw.unlink(missing_ok=True)
+                raise VoiceLimit(f"no clean take for the line: {text[:40]}… -- run again later")
             pitch, pace = 2 ** (float(role.get("semitones", 0.0)) / 12), float(role.get("pace", 1.0))
             shape = (f"rubberband=pitch={pitch:.5f}:tempo={pace:.5f}:formant={role.get('formant', 'preserved')}:pitchq=quality,"
                      if abs(pitch - 1) > 1e-3 or abs(pace - 1) > 1e-3 else "")
             trim = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.06,areverse,"
                     "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.12,areverse,")
             tmp = out.with_suffix(".tmp.wav")
-            subprocess.run([str(self.ffmpeg), "-y", "-loglevel", "error", "-i", str(raw), "-af",
-                            f"{trim}{shape}highpass=f=70,aresample=24000", "-ac", "1", str(tmp)], check=True)
+            subprocess.run([str(self.ffmpeg), "-y", "-loglevel", "error", "-ss", f"{span[0]:.2f}", "-to", f"{span[1]:.2f}",
+                            "-i", str(raw), "-af", f"{trim}{shape}highpass=f=70,aresample=24000", "-ac", "1", str(tmp)], check=True)
             tmp.replace(out)
             raw.unlink(missing_ok=True)
-        info = sf.info(out)
-        return LineAudio(text, out, info.samplerate, info.duration, _spread(text, info.duration))
+        return LineAudio(text, out, sf.info(out).samplerate, sf.info(out).duration, timed_words(out, text))
 
 
 def chunks(lines: list[dict], names: dict[str, str], max_chars: int = 420) -> list[list[dict]]:
@@ -238,6 +244,45 @@ def scene_prompt(chunk: list[dict], names: dict[str, str], roles: dict[str, dict
             f"How each line is said, in order (directions for the actors, never spoken aloud):\n{how}\n"
             f"Speak in natural everyday Tamil exactly as written, like real people talking, with a natural pause "
             f"when the speaker changes. Say only the lines below, once, and then stop.\n\n{text}")
+
+
+def line_span(wav: Path, preamble: str, text: str) -> tuple[float, float] | None:
+    """Where in a take the line itself is spoken: (start, end) in seconds, or None if the take is
+    not usable. A take about as long as the line needs is the line. A longer one is searched: the
+    aligner is given the instructions the model was sent followed by the line, so instructions read
+    aloud take up their own part of the audio and the Tamil line is found after them."""
+    from stories import align
+
+    duration = sf.info(wav).duration
+    if duration < 0.03 * len(text):
+        return None                                   # too short to hold the line
+    if duration <= 1.9 + 0.13 * len(text):
+        return 0.0, duration                          # no room for anything but the line
+    pre = preamble.split()
+    times, _ = align.word_times(wav, pre + text.split())
+    start, end = times[len(pre)][0], times[-1][1]
+    if start < 1.0:                                   # nothing was said before the line: it is just a slow take
+        return (0.0, duration) if duration <= too_long(text) else None
+    if not 0.03 * len(text) <= end - start <= too_long(text):
+        return None
+    log.info("  the voice read its instructions aloud first: %.0f s cut off, the line kept", start)
+    return max(0.0, start - 0.15), min(duration, end + 0.30)
+
+
+def timed_words(wav: Path, text: str) -> list[Word]:
+    """When each word of the clip is spoken (the aligner), kept beside the clip; by word length if
+    the aligner can't run."""
+    timing = Path(wav).with_suffix(".words.json")
+    if not timing.exists():
+        try:
+            from stories import align
+
+            times, _ = align.word_times(wav, text.split())
+            timing.write_text(json.dumps(times), encoding="utf-8")
+        except Exception as e:  # noqa: BLE001 -- captions still work, a little less exactly
+            log.warning("  word timing fell back to an estimate (%s)", str(e)[:100])
+            return _spread(text, sf.info(wav).duration)
+    return [Word(w, float(a), float(b)) for w, (a, b) in zip(text.split(), json.loads(timing.read_text(encoding="utf-8")))]
 
 
 def _sound(role: dict) -> dict:

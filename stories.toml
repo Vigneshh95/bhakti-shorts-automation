@@ -56,7 +56,9 @@ adults = [
 # enabled = false goes back to the laptop's own voice below.
 [acting]
 enabled = true
-models = ["gemini-3.1-flash-tts-preview", "gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]
+models = ["gemini-3.1-flash-tts-preview", "gemini-3.8-flash-tts"]   # the first follows its directions; the second is a
+                                      # fallback that often reads them aloud (such takes are cut or thrown away). The
+                                      # lite and 2.5 models rambled on almost every line and are no longer used.
 requests_per_minute = 8
 per = "turn"                          # "scene" = a whole scene in one or two requests (half the requests; being tested)
 
