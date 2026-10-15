@@ -157,6 +157,36 @@ def _shape(line: LineAudio, style: dict, ffmpeg: Path, cache: Cache) -> LineAudi
     return LineAudio(line.text, out, line.sample_rate, duration, words)
 
 
+def _hear_back(spoken: list, settings: dict, V) -> None:
+    """Before a story counts as made, every clip is heard back by a listening model that is NOT told
+    what to expect (it writes down what it hears). A clip with any English in it (directions read
+    aloud, a remark, an English accent heard as English words) is thrown away and spoken again on
+    the next run. Clips already heard clean are not heard again."""
+    from stories import audit
+
+    todo = [la for la in spoken if not Path(la.wav_path).with_suffix(".heard").exists()]
+    if not todo:
+        return
+    log.info("  listening to %d clip(s) for anything but Tamil…", len(todo))
+    reports = audit.listen([(Path(la.wav_path), "(not given: write down exactly what you hear)") for la in todo], settings)
+    bad = 0
+    for la, r in zip(todo, reports):
+        if r["heard"] is None:
+            continue                                   # not heard this time: heard again on the next run
+        if audit.has_english(r["heard"]):
+            log.warning("  English heard in a clip, it will be spoken again: %s", r["heard"][:120])
+            Path(la.wav_path).unlink(missing_ok=True)
+            Path(la.wav_path).with_suffix(".words.json").unlink(missing_ok=True)
+            Path(la.wav_path).with_suffix(".checked").unlink(missing_ok=True)
+            bad += 1
+        else:
+            Path(la.wav_path).with_suffix(".heard").touch()
+    unheard = sum(r["heard"] is None for r in reports)
+    if bad or unheard:
+        raise V.VoiceLimit(f"{bad} clip(s) had English in them and {unheard} could not be heard yet: "
+                           "they are spoken / heard again on the next run, before the story is finished")
+
+
 def _cast_voices(script: dict, voices: dict, home: set[str]) -> tuple[dict[str, dict], dict[str, str]]:
     """For every speaker of the story: its voice settings, and a plain name for the speech prompt.
     Two characters never share a voice: the second of a kind takes the next of that kind's "alts"."""
@@ -286,6 +316,7 @@ def make(folder: Path, settings: dict) -> Path:
             log.info("  scene %d of %d spoken (%d of %d lines)", i + 1, len(script["scenes"]), done, total)
         if missing:
             raise V.VoiceLimit(f"{missing} line(s) still need a clean take")
+        _hear_back(spoken, settings, V)
         voice = None
     else:
         voice = tts.FastPitchVoice(cfg["paths"]["checkpoints"], int(cfg["run"]["threads"]))

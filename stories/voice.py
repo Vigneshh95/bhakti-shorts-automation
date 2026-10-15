@@ -198,14 +198,16 @@ class Actor:
                 out.with_suffix(".words.json").unlink(missing_ok=True)
         if not hit:
             prompt = (f"You are a voice actor in a Tamil audio drama, playing {role['who']}. Direction: {tone} "
-                      f"Speak in natural everyday Tamil exactly as written, like a real person and not like someone "
+                      f"Speak in natural everyday Tamil exactly as written, with a native Tamil accent (never an English "
+                      f"accent), like a real person and not like someone "
                       f"reading. Say only this line, nothing else:\n{text}")
             # The models sometimes say more than the line: they read their English directions aloud
             # first (seen: 30 s of instructions before a 6 s line), or ramble. Every take is measured
             # against the text: just the line is kept, cut out of the take; a take in which the line
             # can't be found cleanly is thrown away and tried again in the plain "Say <how>: <line>"
             # form. Each try costs one of the day's free requests: three tries, then the run moves on.
-            plain = f"Say this Tamil line as {role['who'].split(':')[0]} would, {tone[0].lower()}{tone[1:]}: {text}"
+            plain = (f"Say this Tamil line in a native Tamil accent as {role['who'].split(':')[0]} would, "
+                     f"{tone[0].lower()}{tone[1:]}: {text}")
             raw = out.with_suffix(".raw.wav")
             for attempt in range(3):
                 used = prompt if attempt == 0 else plain
@@ -257,7 +259,8 @@ def scene_prompt(chunk: list[dict], names: dict[str, str], roles: dict[str, dict
     text = "\n".join(f"{names[l['speaker']]}: {l['text']}" for l in chunk)
     return (f"Perform this moment of a Tamil audio drama. {cast}\n"
             f"How each line is said, in order (directions for the actors, never spoken aloud):\n{how}\n"
-            f"Speak in natural everyday Tamil exactly as written, like real people talking, with a natural pause "
+            f"Speak in natural everyday Tamil exactly as written, with native Tamil accents (never an English "
+            f"accent), like real people talking, with a natural pause "
             f"when the speaker changes. Say only the lines below, once, and then stop.\n\n{text}")
 
 

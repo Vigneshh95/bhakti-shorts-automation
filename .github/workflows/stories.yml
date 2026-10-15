@@ -1,4 +1,6 @@
 name: Make a Story
+# Each run's name in the Actions list says which series it is for.
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Story by hand ({0})', inputs.series) || (startsWith(github.event.schedule, '30 ') && 'Grown-ups story' || 'Kids story') }}
 
 # The long illustrated stories, made and scheduled in the cloud with the laptop switched off: the
 # same pipeline as story_adults.bat / story_kids.bat (python -m stories run).
@@ -7,15 +9,20 @@ name: Make a Story
 #   kids' stories       -> the kids' own channel, public Thursday and Sunday 10:00 IST
 # A story takes more than one run: its pictures are painted on Kaggle (over an hour) and its
 # voices are acted by Gemini's free speech models, which allow a limited number of lines a day.
-# So this runs every day, one series a day in turn, and each run does today's share: it continues
+# So this runs every day, one series a day (the run's name says which), and each run does today's share: it continues
 # the story in progress, or starts a new one when fewer than two are waiting to go public.
 # Unfinished work (pictures, voice lines) is kept between runs in the Actions cache.
 # It can also be started by hand: Actions tab > Make a Story > Run workflow.
 on:
   schedule:
-    # 19:30 UTC = 01:00 IST: after the free speech allowance of the day before has come back.
-    - cron: "30 19 * * *"
-    - cron: "30 1 * * *"    # 07:00 IST: a second start, in case GitHub skipped or delayed the first
+    # 01:00 IST (19:30 UTC the day before): after the free speech allowance of the day before has
+    # come back; 07:00 IST: a second start, in case GitHub skipped or delayed the first.
+    # Grown-ups' stories (minute 30): Sunday, Monday, Wednesday, Friday (India days)
+    - cron: "30 19 * * 0,2,4,6"
+    - cron: "30 1 * * 0,1,3,5"
+    # Kids' stories (minute 31): Tuesday, Thursday, Saturday (India days)
+    - cron: "31 19 * * 1,3,5"
+    - cron: "31 1 * * 2,4,6"
   workflow_dispatch:
     inputs:
       series:
@@ -67,9 +74,9 @@ jobs:
             $approved = Get-ChildItem .cache/assets_repo/story_episodes -Directory -ErrorAction SilentlyContinue | Where-Object {
               (Test-Path "$($_.FullName)/approved.json") -and -not (Test-Path "$($_.FullName)/published.json") -and
               ((Get-Content "$($_.FullName)/maker.json" -Raw -ErrorAction SilentlyContinue) -match "cloud") } | Select-Object -First 1
-            # one series a day in turn (India date): the day's free voice lines go to one story
-            $day = [DateTime]::UtcNow.AddHours(5.5).Date
-            $series = if ((($day - [DateTime]::ParseExact("2026-10-12", "yyyy-MM-dd", $null)).Days % 2) -eq 0) { "adults" } else { "kids" }
+            # the series of this start (its minute: 30 = grown-ups, 31 = kids); one series a day, so the
+            # day's free voice lines go to one story
+            $series = if ("${{ github.event.schedule }}".StartsWith("30 ")) { "adults" } else { "kids" }
             if ($approved) { $series = $approved.Name.Split("-")[0] }
             $upload = "true"
           }

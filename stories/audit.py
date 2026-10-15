@@ -13,8 +13,10 @@ from pathlib import Path
 
 LISTEN_SYSTEM = """You are checking the recordings of a Tamil audio drama. For each numbered clip you are
 given the line the actor was supposed to say. Listen to the clip and report:
-- heard: everything spoken in the clip, written exactly as heard (Tamil in Tamil script, English in
-  English), including any words before or after the expected line.
+- heard: everything spoken in the clip, written exactly as heard, including any words before or
+  after the expected line. Tamil speech is written in Tamil script, INCLUDING the English words that
+  Tamil speakers use inside Tamil sentences (ஆபீஸ், டீ, சாரி, போன்...). Use English letters ONLY for
+  speech that is actually in the English language (English sentences, instructions read aloud).
 - extra: true if the clip contains ANY speech besides the expected line: English words or sentences,
   stage directions or descriptions read aloud, a speaker's name read aloud, commentary, the line
   said twice, or a different sentence. false only if it is just the expected line (small
@@ -66,3 +68,9 @@ def listen(clips: list[tuple[Path, str]], settings: dict, batch: int = 6) -> lis
                 c["extra"] = bool(c["extra"]) or bool(_LATIN.search(c["heard"]))   # any English word heard counts
                 out.append(c)
     return out
+
+
+def has_english(heard: str) -> bool:
+    """English words in what was heard (a Tamil story has none; English loan words like "ஆபீஸ்" are
+    written in Tamil script and don't count)."""
+    return bool(_LATIN.search(heard or ""))
