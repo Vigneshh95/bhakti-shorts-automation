@@ -94,7 +94,7 @@ def _merge_state() -> None:
     for side_a, side_b in ((CLONE, ROOT), (ROOT, CLONE)):
         for series in ("adults", "kids"):
             for record in (side_a / "story_episodes").glob(f"{series}-*/*.json"):
-                if record.name in ("script.json", "published.json", "approved.json", "maker.json"):
+                if record.name in ("script.json", "published.json", "approved.json", "maker.json", "made.json"):
                     target = side_b / record.relative_to(side_a)
                     if not target.exists():   # the first copy stands: a story's script belongs to the machine making it
                         target.parent.mkdir(parents=True, exist_ok=True)

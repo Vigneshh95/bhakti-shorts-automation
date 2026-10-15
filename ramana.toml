@@ -115,6 +115,7 @@ advice; a misleading or clickbait title; the message clearly doesn't fit the cho
 description. Minor stylistic preferences are not issues."""
 
 [look]
+zoom = false                        # the picture whole and still (no zoom-in, no slow zoom or drift)
 loop = true
 glow_pulse = true
 talking = false                       # a still portrait with slow movement: no moving lips for the sage of silence

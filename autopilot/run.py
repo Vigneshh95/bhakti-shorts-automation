@@ -183,7 +183,10 @@ def _episode_toml(script: Script, look: dict, video: dict | None = None) -> str:
     loop = look.get("loop", True)
     return (f"[episode]\ntitle = {json.dumps(script.hook_title, ensure_ascii=False)}\n\n"
             f"[captions]\nemphasis = [{keywords}]\n\n"
-            f"[effects.kenburns]\nloop = {str(loop).lower()}\n\n"
+            # The picture as it is: whole and still unless the series asks for the slow zoom ("zoom" in
+            # [look]). headroom 1.0 = not enlarged at all (the zoom needs 12% spare picture around the frame).
+            f"[effects.kenburns]\nloop = {str(loop).lower()}\nenabled = {str(look.get('zoom', False)).lower()}\n"
+            f"{'' if look.get('zoom', False) else 'headroom = 1.0' + chr(10)}\n"
             f"[effects.glow_pulse]\nenabled = {str(look.get('glow_pulse', True)).lower()}\n\n"
             # Open on the picture itself (the first frame is what stops the scroll) and don't fade
             # to black at the end, which would break the seamless loop.

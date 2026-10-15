@@ -117,6 +117,7 @@ words or that he himself speaks in this video (e.g. "பெரியவா இ�
 preferences are not issues."""
 
 [look]
+zoom = false                        # the picture whole and still (no zoom-in, no slow zoom or drift)
 loop = true
 glow_pulse = true
 talking = true                        # lips move with the voice (SadTalker on Kaggle, ~10 min)

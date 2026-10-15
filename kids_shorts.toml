@@ -100,6 +100,7 @@ unsuitable for small children; a misleading or clickbait title; the message clea
 the chosen picture's description. Minor stylistic preferences are not issues."""
 
 [look]
+zoom = false                        # the picture whole and still (no zoom-in, no slow zoom or drift)
 loop = true
 glow_pulse = true
 talking = true                        # Murugan's lips move with the words (SadTalker on Kaggle)

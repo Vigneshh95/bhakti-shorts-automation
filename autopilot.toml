@@ -56,6 +56,7 @@ name_ta = "கார்த்திகை தீபம்"
 name_en = "Karthigai Deepam"
 
 [look]                              # extra effects for autopilot videos only (manual workflow unaffected)
+zoom = false                        # the picture whole and still (no zoom-in, no slow zoom or drift)
 loop = true                         # motion returns to its start: seamless replays
 glow_pulse = true                   # soft "breathing" divine light around the subject
 talking = true                      # SadTalker: Murugan's lips move with the words (~2 h per Short on this CPU, cached)

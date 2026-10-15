@@ -158,6 +158,10 @@ def approve(series: str, interactive: bool = True) -> str:
             return f"{series}: no finished story is waiting for approval"
         folder = ready[0]["folder"]
         (folder / "approved.json").write_text(json.dumps({"approved_at": datetime.now(P.IST).isoformat()}), encoding="utf-8")
+        if _maker(folder) not in (None, _here()):
+            # made on the other machine: its video is there, so it uploads it on its next run
+            return (f"{series}: {folder.name} is approved; the {_maker(folder)} has its video and will schedule it on "
+                    f"its next run (the cloud's story runs start about 1 AM and 7 AM)")
         record = P.publish(folder, settings, interactive)
         if record is None:
             return f"{series}: {folder.name} is approved, but this series' YouTube channel is not signed in yet"

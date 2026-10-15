@@ -63,9 +63,14 @@ jobs:
         run: |
           $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
           if ("${{ github.event_name }}" -eq "schedule") {
+            # an approved story waiting to be uploaded goes first, whatever the day
+            $approved = Get-ChildItem .cache/assets_repo/story_episodes -Directory -ErrorAction SilentlyContinue | Where-Object {
+              (Test-Path "$($_.FullName)/approved.json") -and -not (Test-Path "$($_.FullName)/published.json") -and
+              ((Get-Content "$($_.FullName)/maker.json" -Raw -ErrorAction SilentlyContinue) -match "cloud") } | Select-Object -First 1
             # one series a day in turn (India date): the day's free voice lines go to one story
             $day = [DateTime]::UtcNow.AddHours(5.5).Date
             $series = if ((($day - [DateTime]::ParseExact("2026-10-12", "yyyy-MM-dd", $null)).Days % 2) -eq 0) { "adults" } else { "kids" }
+            if ($approved) { $series = $approved.Name.Split("-")[0] }
             $upload = "true"
           }
           "series=$series", "upload=$upload" | Add-Content $env:GITHUB_OUTPUT
