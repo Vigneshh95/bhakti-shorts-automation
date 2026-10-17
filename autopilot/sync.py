@@ -94,9 +94,12 @@ def _merge_state() -> None:
     for side_a, side_b in ((CLONE, ROOT), (ROOT, CLONE)):
         for series in ("adults", "kids"):
             for record in (side_a / "story_episodes").glob(f"{series}-*/*.json"):
-                if record.name in ("script.json", "published.json", "approved.json", "maker.json", "made.json"):
+                if record.name in ("script.json", "published.json", "approved.json", "maker.json", "made.json", "rework.json"):
                     target = side_b / record.relative_to(side_a)
-                    if not target.exists():   # the first copy stands: a story's script belongs to the machine making it
+                    newer_request = (record.name == "rework.json" and target.exists()
+                                     and json.loads(record.read_text(encoding="utf-8")).get("id", "")
+                                     > json.loads(target.read_text(encoding="utf-8")).get("id", ""))
+                    if not target.exists() or newer_request:   # otherwise the first copy stands
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(record, target)
     # each day's reviewed script: whichever side wrote it first is used by the other

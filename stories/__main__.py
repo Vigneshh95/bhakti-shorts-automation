@@ -112,6 +112,7 @@ def _run(series: str, upload: bool, interactive: bool, settings: dict, make, Voi
         (folder / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
         log.info("  \"%s\" (%d scenes)", script["title_ta"], len(script["scenes"]))
 
+    _apply_rework(folder)
     if not (folder / "made.json").exists():      # (a finished story is not rendered again on every run)
         try:
             log.info("▶ pictures, voices and video for %s", folder.name)
@@ -134,6 +135,55 @@ def _run(series: str, upload: bool, interactive: bool, settings: dict, make, Voi
         return f"{series}: {folder.name} is made, but this series' YouTube channel is not signed in yet"
     return (f"{series}: {folder.name} uploaded https://youtu.be/{record['video_id']} -- public "
             f"{datetime.fromisoformat(record['slot']):%a %d %b %H:%M} IST")
+
+
+def _apply_rework(folder: Path) -> None:
+    """A finished story sent back (rework.json, from `python -m stories rework` on any machine):
+    the named pictures are repainted with their fix notes, every picture is checked again, every
+    voice line is heard again, and the story waits for approval again."""
+    req = folder / "rework.json"
+    if not req.exists():
+        return
+    request = json.loads(req.read_text(encoding="utf-8"))
+    done_path = folder / "rework_done.json"
+    done = json.loads(done_path.read_text(encoding="utf-8")) if done_path.exists() else []
+    if request["id"] in done:
+        return
+    script = json.loads((folder / "script.json").read_text(encoding="utf-8"))
+    for n, fix in request.get("scenes", {}).items():
+        script["scenes"][int(n) - 1]["fix"] = fix
+        (folder / "pictures" / f"scene_{int(n):02d}.png").unlink(missing_ok=True)
+    (folder / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
+    for marker in [*(folder / "pictures").glob(".checked_*"), folder / "made.json", folder / "approved.json"]:
+        marker.unlink(missing_ok=True)
+    for heard in Path(".cache/story_actor").glob("*.heard"):     # every line is heard again
+        heard.unlink()
+    done.append(request["id"])
+    done_path.write_text(json.dumps(done), encoding="utf-8")
+    log.info("▶ reworking %s: %s", folder.name, request.get("why", ""))
+
+
+def rework(series: str, scenes: dict[int, str], why: str) -> str:
+    """Sends the series' finished (not yet uploaded) story back: pictures to repaint with what they
+    should show, and every voice line to be heard again. The machine making it does the work."""
+    from autopilot import sync
+
+    settings = writer.load_settings()
+    sync.pull()
+    try:
+        ready = [r for r in _records(settings, series) if not r["published"]]
+        if not ready:
+            return f"{series}: no unpublished story to rework"
+        folder = ready[0]["folder"]
+        rid = datetime.now(P.IST).strftime("%Y%m%d%H%M%S")
+        (folder / "rework.json").write_text(json.dumps({"id": rid, "why": why, "scenes": {str(k): v for k, v in scenes.items()}},
+                                                       ensure_ascii=False, indent=1), encoding="utf-8")
+        (folder / "approved.json").unlink(missing_ok=True)
+        if _maker(folder) in (None, _here()):
+            _apply_rework(folder)
+        return f"{series}: {folder.name} sent back for rework ({why}); it waits for your approval again when done"
+    finally:
+        sync.push(pictures=False)
 
 
 def _open(path: Path) -> None:
@@ -198,12 +248,19 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status")
     ok = sub.add_parser("approve")
     ok.add_argument("--series", choices=["adults", "kids"], required=True)
+    rw = sub.add_parser("rework", help="send a finished story back: repaint pictures, hear every voice line again")
+    rw.add_argument("--series", choices=["adults", "kids"], required=True)
+    rw.add_argument("--scene", action="append", default=[], help='N=what the picture should show (repeatable)')
+    rw.add_argument("--why", default="changes after review")
     s = sub.add_parser("signin")
     s.add_argument("--series", choices=["adults", "kids"], required=True)
     args = ap.parse_args(argv)
     try:
         if args.cmd == "run":
             log.info("✅ %s", run(args.series, upload=not args.no_upload, interactive=not args.scheduled))
+        elif args.cmd == "rework":
+            scenes = {int(x.split("=", 1)[0]): x.split("=", 1)[1] for x in args.scene}
+            log.info("✅ %s", rework(args.series, scenes, args.why))
         elif args.cmd == "approve":
             log.info("✅ %s", approve(args.series))
         elif args.cmd == "status":

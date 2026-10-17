@@ -94,6 +94,10 @@ ok=false ONLY for clear faults that a viewer would notice:
 - a person who must be there is missing, or an extra main person or a second peacock appears;
 - a person's age is clearly wrong (a grown man or woman drawn as a child, or the reverse);
 - what is happening contradicts the description (e.g. looking at the phone when it should be put down);
+- something is in the picture that the STORY says is not there or not true: you are given the lines
+  spoken over each picture and what the story is about. (A boy lies that a cat broke the pot: no cat
+  may appear in any picture. Grandmother looks out of the window for the cat: the window shows an
+  empty garden.) Check every picture against the lines spoken over it, not only its description;
 - visible writing, letters or a caption in the picture;
 - badly deformed faces or hands;
 - baby Murugan's forehead shows a vertical or U-shaped mark where three HORIZONTAL white ash
@@ -127,9 +131,13 @@ def check_pictures(script: dict, paths: list[Path], settings: dict, batch: int =
             label = paths[i].stem
             images.append((label, buf.getvalue()))
             scene = script["scenes"][i]
-            notes.append(f"{label}: {S.picture_prompt(scene, script.get('person_look', ''), script.get('tale_cast'))}")
+            said = " ".join(l["text"] for l in scene["lines"])
+            notes.append(f"{label}: {S.picture_prompt(scene, script.get('person_look', ''), script.get('tale_cast'))}"
+                         f"\n   Spoken over it (Tamil): {said}")
         try:
-            result = writer.ask(settings, CHECK_SYSTEM, "Meant to show:\n" + "\n".join(notes), CHECK_SCHEMA, images)
+            about = (f"The story: {script.get('title_ta', '')} -- {script.get('lesson_ta', '')} "
+                     f"(today's problem: {script.get('topic', '')})\n\n")
+            result = writer.ask(settings, CHECK_SYSTEM, about + "Meant to show:\n" + "\n".join(notes), CHECK_SCHEMA, images)
         except RuntimeError as e:
             log.warning("  the pictures couldn't be checked (%s); using them as painted", str(e)[:100])
             return bad

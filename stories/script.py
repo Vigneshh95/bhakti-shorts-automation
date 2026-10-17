@@ -105,6 +105,11 @@ The episode is a list of scenes. Each scene is ONE picture with the lines spoken
   or "the person". One clear moment per picture; at most three characters in a picture. Never ask
   for writing, letters, a title card or a quotation in a picture (painters garble Tamil letters);
   the captions show the words.
+  Describe ONLY what is really there to be seen at that moment of the story. Never name in a picture
+  something that is absent, imagined, feared, lied about or only talked about: the painter paints
+  every thing that is named. (A child lies that "a cat broke the pot": the pictures show no cat at
+  all; for "Paatti looks for the cat" write "Paatti looks out of the open window at the empty garden".)
+  The picture must agree with the lines spoken over it and with what the story says is true.
 - characters: who is visible in that picture.
 - lines: 3-5 spoken lines for that scene. speaker is who says it. Natural spoken Tamil that a
   voice model will read aloud: Tamil script only (no English letters, no digits, no emoji, no
@@ -136,7 +141,11 @@ Return only JSON matching the schema."""
 KIDS = COMMON + """
 
 THIS SERIES: "குட்டி முருகன் கதைகள்", for children of 4-10 watching with a parent.
-Cast: Ilango (a boy of 8), his sister Kuzhali (6), their grandmother Avvai Paatti, Murugan, the peacock.
+Cast: Ilango (a boy of 8), his little sister Kuzhali (6), their grandmother Avvai Paatti, Murugan,
+the peacock. Every episode is a story of this BROTHER AND SISTER together: children love them. Both
+are in the opening moment and in the ending; their bond is part of the story every time (they tease,
+help, share, quarrel and make up, stand up for each other), and Kuzhali speaks in at least three
+scenes. Today's problem may belong to either of them, and the other one has a real part in it.
 Shape, {smin}-{smax} scenes in all:
 1. A real moment from a child's day where today's problem shows itself (2-3 scenes).
 2. Murugan and the peacock arrive, playful and kind (1-2 scenes).
@@ -147,8 +156,7 @@ Shape, {smin}-{smax} scenes in all:
 youtube_title must say in Tamil that it is a story for children, in this shape:
 "<the Aathichoodi line> | குழந்தைகளுக்கான குட்டி முருகன் கதை | Kids Moral Story".
 Very simple words and short sentences. Warm and a little funny. Nothing frightening, no violence,
-no punishment, nobody is shamed: the child is good and is learning. Kuzhali takes part in at least
-two scenes. person_look: empty string.
+no punishment, nobody is shamed: the child is good and is learning. person_look: empty string.
 Today's problem: {topic}."""
 
 ADULTS = COMMON + """
