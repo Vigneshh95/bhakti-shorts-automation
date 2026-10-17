@@ -134,7 +134,7 @@ def pull() -> bool:
     if not available():
         return False
     try:
-        res = _git("pull", "-q", "--no-rebase")
+        res = _git("-c", "user.name=laptop", "-c", "user.email=laptop@users.noreply.github.com", "pull", "-q", "--no-rebase", "--no-edit")
         if res.returncode != 0:
             log.warning("  couldn't read the shared history (%s); using this laptop's own",
                         (res.stderr or res.stdout).strip().splitlines()[-1:] or "?")
@@ -151,7 +151,7 @@ def push(pictures: bool = True) -> bool:
     if not available():
         return False
     try:
-        _git("pull", "-q", "--no-rebase")
+        _git("-c", "user.name=laptop", "-c", "user.email=laptop@users.noreply.github.com", "pull", "-q", "--no-rebase", "--no-edit")
         _merge_state()
         if pictures:
             for folder in PICTURE_FOLDERS:
