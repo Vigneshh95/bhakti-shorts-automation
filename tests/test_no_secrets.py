@@ -15,7 +15,8 @@ PATTERNS = {
     "OpenAI / Anthropic key": r"sk-(ant-)?[0-9A-Za-z_\-]{30,}",
     "private key": r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
 }
-NEVER_TRACKED = [".env", "client_secret.json", "murugan_token.json", "kids_token.json", "youtube_token.json"]
+NEVER_TRACKED = [".env", "client_secret.json", "murugan_token.json", "kids_token.json", "youtube_token.json",
+                 "sign_in_files/1_BrahmaNadagam_YouTube_sign_in.json", "sign_in_files/2_Kids_channel_YouTube_sign_in.json", "sign_in_files/3_Google_app_client_secret.json"]
 
 
 def _tracked() -> list[Path]:
@@ -39,7 +40,7 @@ def test_no_key_or_token_in_any_tracked_file():
 
 
 def test_sign_in_and_key_files_are_never_tracked():
-    tracked = {p.name for p in _tracked()}
+    tracked = {p.relative_to(ROOT).as_posix() for p in _tracked()} | {p.name for p in _tracked()}
     assert not tracked & set(NEVER_TRACKED), f"tracked by git: {tracked & set(NEVER_TRACKED)}"
     ignored = subprocess.run(["git", "check-ignore", *NEVER_TRACKED], cwd=ROOT, capture_output=True, text=True).stdout.split()
     assert set(ignored) == set(NEVER_TRACKED), f"not ignored by .gitignore: {set(NEVER_TRACKED) - set(ignored)}"

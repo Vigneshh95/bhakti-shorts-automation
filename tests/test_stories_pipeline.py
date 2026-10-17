@@ -31,7 +31,7 @@ def test_topics_are_told_in_turn_and_start_again_with_the_oldest():
 def test_kids_stories_have_their_own_channel_and_wait_for_its_sign_in(tmp_path, monkeypatch):
     settings = writer.load_settings()
     main, kids = P.channel("adults", settings["youtube"]["adults"]), P.channel("kids", settings["youtube"]["kids"])
-    assert kids["token_file"].name == "kids_token.json" and main["token_file"].name != "kids_token.json"
+    assert kids["token_file"].name == "2_Kids_channel_YouTube_sign_in.json" and main["token_file"].name != "2_Kids_channel_YouTube_sign_in.json"
     assert settings["youtube"]["kids"]["made_for_kids"] is True and settings["youtube"]["adults"]["made_for_kids"] is False
     monkeypatch.setenv("YT_TOKEN_FILE_KIDS", str(tmp_path / "missing_token.json"))
     folder = tmp_path / "kids-2026-10-12"
@@ -60,8 +60,8 @@ def test_kids_shorts_go_to_the_kids_channel_and_are_declared_made_for_kids(monke
 
     kids, main = load_settings(series="kids"), load_settings(series="murugan")
     assert kids["youtube"]["made_for_kids"] is True and kids["youtube"]["channel_id"].startswith("UC")
-    assert youtube.channel_config(kids)["token_file"].name == "kids_token.json"
-    assert youtube.channel_config(main)["token_file"].name != "kids_token.json"
+    assert youtube.channel_config(kids)["token_file"].name == "2_Kids_channel_YouTube_sign_in.json"
+    assert youtube.channel_config(main)["token_file"].name != "2_Kids_channel_YouTube_sign_in.json"
     assert youtube.channel_config(kids)["playlist_id"] == ""            # the main channel's playlist is not used
     monkeypatch.setenv("YT_TOKEN_FILE_KIDS", str(tmp_path / "cloud_kids.json"))
     assert youtube.channel_config(kids)["token_file"] == tmp_path / "cloud_kids.json"

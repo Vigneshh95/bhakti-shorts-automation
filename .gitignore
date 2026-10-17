@@ -2,6 +2,7 @@
 .env
 client_secret*.json
 *_token.json
+/sign_in_files/
 token.json
 
 # --- environments / third-party checkouts ---
