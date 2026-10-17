@@ -17,10 +17,10 @@ from autopilot import sync
 from shorts.log import log
 
 PIPELINES = {
-    "short-murugan": "Short - Murugan (BrahmaNadagam, Mon/Thu/Sun 18:30)",
-    "short-periyava": "Short - Mahaperiyava (BrahmaNadagam, Tue/Fri 18:30)",
-    "short-krishna": "Short - Krishna (BrahmaNadagam, Wed/Sat 18:30)",
-    "short-kids": "Short - Kids channel (every day 17:30)",
+    "short-murugan": "Short - Murugan (BrahmaNadagam, every other day 18:30)",
+    "short-periyava": "Short - Mahaperiyava (BrahmaNadagam, every other day 18:30)",
+    "short-kids": "Short - Kids Murugan (kids' channel, every other day 17:30)",
+    "short-krishna": "Short - Kids Krishna (kids' channel, every other day 17:30)",
     "story-adults": "Story - Grown-ups (BrahmaNadagam)",
     "story-kids": "Story - Kids (kids' channel)",
     "all": "ALL pipelines at once",

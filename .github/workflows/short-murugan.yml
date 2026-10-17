@@ -1,16 +1,16 @@
 name: Short - Murugan
-# Baby Murugan's message of the day on BrahmaNadagam. Days: Sun, Mon, Thu
-# Public 18:30 on Monday, Thursday and Sunday IST. Several starts per day: GitHub often runs schedules late or skips one; the
+# Baby Murugan's message on BrahmaNadagam, in turn with Mahaperiyava (one Short a day).
+# Public 18:30 every other day IST (days counted from 18 Oct 2026). Several starts per day: GitHub often runs schedules late or skips one; the
 # first start that works makes and uploads the Short, the later ones see it is done and stop.
 # STOP this pipeline: Actions > Short - Murugan > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
 run-name: Short - Murugan${{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
 on:
   schedule:
-    - cron: "17 22 * * 0,3,6"   # 03:47 IST
-    - cron: "47 0 * * 0,1,4"   # 06:17 IST
-    - cron: "47 3 * * 0,1,4"   # 09:17 IST
-    - cron: "17 9 * * 0,1,4"   # 14:47 IST
-    - cron: "47 11 * * 0,1,4"   # 17:17 IST
+    - cron: "17 22 * * *"   # 03:47 IST
+    - cron: "47 0 * * *"   # 06:17 IST
+    - cron: "47 3 * * *"   # 09:17 IST
+    - cron: "17 9 * * *"   # 14:47 IST
+    - cron: "47 11 * * *"   # 17:17 IST
   workflow_dispatch:
     inputs:
       upload:
@@ -27,4 +27,6 @@ jobs:
       pipeline: short-murugan
       upload: ${{ github.event_name == 'schedule' || inputs.upload }}
       publish_hour: 18
+      every: 2
+      turn: 0
     secrets: inherit

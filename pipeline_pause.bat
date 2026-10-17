@@ -11,8 +11,8 @@ set PY="%SCRIPT_DIR%.venv\Scripts\python.exe"
 echo.
 echo   1  Short - Murugan          5  Story - Grown-ups
 echo   2  Short - Mahaperiyava     6  Story - Kids
-echo   3  Short - Krishna          7  ALL pipelines
-echo   4  Short - Kids channel
+echo   3  Short - Kids Krishna     7  ALL pipelines
+echo   4  Short - Kids Murugan
 echo.
 set /p N=Which pipeline (1-7)? 
 set NAME=

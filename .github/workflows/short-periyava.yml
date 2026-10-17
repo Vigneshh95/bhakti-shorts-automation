@@ -1,16 +1,16 @@
 name: Short - Mahaperiyava
-# The essence of one Deivathin Kural chapter on BrahmaNadagam. Days: Tue, Fri
-# Public 18:30 on Tuesday and Friday IST. Several starts per day: GitHub often runs schedules late or skips one; the
+# The essence of one Deivathin Kural chapter on BrahmaNadagam, in turn with Murugan.
+# Public 18:30 every other day IST (days counted from 18 Oct 2026). Several starts per day: GitHub often runs schedules late or skips one; the
 # first start that works makes and uploads the Short, the later ones see it is done and stop.
 # STOP this pipeline: Actions > Short - Mahaperiyava > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
 run-name: Short - Mahaperiyava${{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
 on:
   schedule:
-    - cron: "17 22 * * 1,4"   # 03:47 IST
-    - cron: "47 0 * * 2,5"   # 06:17 IST
-    - cron: "47 3 * * 2,5"   # 09:17 IST
-    - cron: "17 9 * * 2,5"   # 14:47 IST
-    - cron: "47 11 * * 2,5"   # 17:17 IST
+    - cron: "17 22 * * *"   # 03:47 IST
+    - cron: "47 0 * * *"   # 06:17 IST
+    - cron: "47 3 * * *"   # 09:17 IST
+    - cron: "17 9 * * *"   # 14:47 IST
+    - cron: "47 11 * * *"   # 17:17 IST
   workflow_dispatch:
     inputs:
       upload:
@@ -27,4 +27,6 @@ jobs:
       pipeline: short-periyava
       upload: ${{ github.event_name == 'schedule' || inputs.upload }}
       publish_hour: 18
+      every: 2
+      turn: 1
     secrets: inherit

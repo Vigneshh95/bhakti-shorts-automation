@@ -1,9 +1,9 @@
-name: Story - Grown-ups
+name: Story · Grown-ups
 # The grown-ups' illustrated story (public Wednesday and Saturday 19:00 IST on BrahmaNadagam).
 # Runs every day: on its own days (Sun, Mon, Wed, Fri) it makes the story in progress or starts the next one; on
 # the other days it only uploads an approved story or redoes a story sent back for rework.
-# STOP this pipeline: Actions > Story - Grown-ups > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
-run-name: Story - Grown-ups${{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
+# STOP this pipeline: Actions > Story · Grown-ups > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
+run-name: Story · Grown-ups${{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
 on:
   schedule:
     - cron: "30 19 * * *"   # 01:00 IST

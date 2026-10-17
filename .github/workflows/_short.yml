@@ -12,6 +12,8 @@ on:
       pipeline: {type: string, required: true}         # its name in pauses.json, e.g. short-murugan
       upload: {type: boolean, default: true}
       publish_hour: {type: number, default: 18}        # a start after this hour (IST) is too late for today's slot
+      every: {type: number, default: 1}                # 2 = every other day ...
+      turn: {type: number, default: 0}                 # ... on the days numbered `turn` (0 or 1) counted from 18 Oct 2026
 
 jobs:
   short:
@@ -55,17 +57,21 @@ jobs:
             $p = Get-Content $pauses -Raw -Encoding utf8 | ConvertFrom-Json
             if ($p."${{ inputs.pipeline }}" -or $p.all) { $skip = "this pipeline is PAUSED (pipeline_pause.bat on the laptop resumes it)" }
           }
-          if ($series -eq "krishna") {      # until Krishna's pictures are in the private files, Murugan takes his day
+          # whose day it is: two series sharing a channel take alternate days
+          $n = ((($now.Date - [DateTime]::ParseExact("2026-10-18", "yyyy-MM-dd", $null)).Days % ${{ inputs.every }}) + ${{ inputs.every }}) % ${{ inputs.every }}
+          if (-not $skip -and "${{ github.event_name }}" -eq "schedule" -and $n -ne ${{ inputs.turn }}) { $skip = "not this series' day (it alternates with the other series on this channel)" }
+          if ($series -eq "krishna") {      # until Krishna's pictures are in the private files, Kutti Murugan takes his day
             $has = [bool](Get-ChildItem ".cache/assets_repo/krishna_images" -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".png", ".jpg", ".jpeg", ".webp" })
-            if (-not $has) { $series = "murugan"; Write-Host "::warning title=krishna::No Krishna pictures in the private files yet: making a Murugan Short today" }
+            if (-not $has) { $series = "kids"; Write-Host "::warning title=krishna::No Krishna pictures in the private files yet: making a Kutti Murugan Short today" }
           }
           if ($scheduled -and $now.Hour -ge ${{ inputs.publish_hour }}) { $skip = "this start ran too late for today's publish time (the next starts carry on)" }
-          if ($series -eq "kids" -and $upload -eq "true" -and $env:HAS_KIDS_SIGN_IN -ne "true") { $skip = "the YT_TOKEN_KIDS_JSON secret is not set" }
+          $kidsChannel = $series -in "kids", "krishna"
+          if ($kidsChannel -and $upload -eq "true" -and $env:HAS_KIDS_SIGN_IN -ne "true") { $skip = "the YT_TOKEN_KIDS_JSON secret is not set" }
           $folder = if ($series -eq "murugan") { "auto" } else { $series }
           $done = $false
           if ($upload -eq "true" -and -not $skip) {
             # Done when a Short already goes public today on this channel, whichever series or start made it.
-            $same = if ($series -eq "kids") { @("kids") } else { @("auto", "periyava", "ramana", "krishna") }
+            $same = if ($kidsChannel) { @("kids", "krishna") } else { @("auto", "periyava", "ramana") }
             foreach ($f in $same) {
               $history = ".cache/assets_repo/episodes/$f/history.json"
               if (-not (Test-Path $history)) { continue }
@@ -137,7 +143,7 @@ jobs:
           python -m autopilot --series ${{ steps.plan.outputs.series }} run --scheduled --date ${{ steps.plan.outputs.day }} @extra 2>&1 | Tee-Object -FilePath run.log
           $code = $LASTEXITCODE
           $last = (Get-Content run.log | Where-Object { $_ -match "^\d\d:\d\d:\d\d (INFO|WARNING|ERROR)" -and $_ -match "✅|⏸|ERROR|WARNING|Uploaded|stopped|Already|talking head|animated|title:" } | Select-Object -Last 10) -join "%0A"
-          $secret = if ("${{ steps.plan.outputs.series }}" -eq "kids") { "YT_TOKEN_KIDS_JSON" } else { "YT_TOKEN_JSON" }
+          $secret = if ("${{ steps.plan.outputs.series }}" -in "kids", "krishna") { "YT_TOKEN_KIDS_JSON" } else { "YT_TOKEN_JSON" }
           if ($code -ne 0) { Write-Host "::error title=${{ inputs.pipeline }}: the Short was not made::$last"; exit $code }
           if ($last -match "⏸") { Write-Host "::error title=${{ inputs.pipeline }}: made but NOT uploaded (YouTube sign-in expired: update the $secret secret)::$last"; exit 1 }
           if (Select-String -Path run.log -Pattern "talking head skipped|using the still picture|no laptop fallback" -Quiet) {
