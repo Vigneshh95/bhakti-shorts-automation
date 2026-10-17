@@ -23,7 +23,9 @@ releases_per_week = 2                 # per series (schedule to be set with the 
 # The pipeline (python -m stories run): keeps this many finished stories scheduled ahead per series.
 [pipeline]
 stories_ahead = 2
-review_first = true                   # a finished story waits until you have watched it and run story_approve_<series>.bat
+review_first = false                  # true = a finished story waits until you have watched it and run
+                                      # story_approve_<series>.bat. false (2026-10-17, user away for a month): it is
+                                      # uploaded on its own once every automatic check has passed.
 
 [topics]
 kids = [
@@ -37,6 +39,26 @@ kids = [
   "teasing another child who is different",
   "not listening to grandmother and elders",
   "wanting everything the other children have",
+  "not wanting to go to school in the morning",
+  "being scared of the doctor's injection",
+  "losing at a game and crying",
+  "breaking a promise to a friend",
+  "not sharing the TV remote",
+  "being rude to the house helper",
+  "making fun of an old person",
+  "not wanting to eat vegetables",
+  "taking something without asking",
+  "being afraid to speak in class",
+  "a new baby in the family",
+  "a friend moving away",
+  "forgetting homework and making excuses",
+  "fighting over who sits by the window",
+  "copying a friend's answers",
+  "wasting water while brushing teeth",
+  "hurting a dog or cat for fun",
+  "always wanting the biggest share",
+  "not saying thank you for a gift",
+  "being impatient waiting in a queue",
 ]
 adults = [
   "comparing your life with what others show on their phones",
@@ -49,6 +71,26 @@ adults = [
   "a quarrel between brothers over family property",
   "caring for an ageing parent while feeling exhausted",
   "grief after losing someone dear",
+  "a son who never calls his parents",
+  "losing a job at forty",
+  "a daughter-in-law and mother-in-law who don't speak",
+  "spending beyond one's means to impress relatives",
+  "a friendship broken over money lent",
+  "the loneliness of a new city",
+  "a husband who never says thank you at home",
+  "a student who failed an entrance exam",
+  "jealousy of a colleague's promotion",
+  "anger in traffic every morning",
+  "an old father who refuses help",
+  "a mother who can't let go of a grown child",
+  "gossip that hurt someone",
+  "a long-held grudge between neighbours",
+  "the urge to lie on a job application",
+  "retirement and feeling useless",
+  "caring for a sick spouse",
+  "a young person addicted to the phone at night",
+  "comparing one's children with others' children",
+  "regret over words said to a parent who has died",
 ]
 
 # Acted voices (stories/voice.py): Gemini's speech models speak every line as its character, with the

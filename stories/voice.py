@@ -98,7 +98,17 @@ class Actor:
         # Each speech model gives 10 free requests a day PER KEY. The Shorts' key has its own speech
         # allowance, which the Shorts never use (they only write text), so the stories use both.
         keys = list(dict.fromkeys(k for k in (api_key("GEMINI_API_KEY_STORIES"), api_key("GEMINI_API_KEY")) if k))
-        self.models = [(model, key) for model in self.cfg["models"] for key in keys]   # best model first, on every key
+        # The configured speech model(s) if Google still offers them; if a preview model has been
+        # retired while nobody is watching, the newest speech model that remains (its takes go
+        # through the same checks: instructions cut off, every clip heard back for English).
+        from autopilot.providers.gemini import available_models, newest
+
+        wanted = list(self.cfg["models"])
+        offered = available_models(keys[0]) if keys else []
+        if offered and not any(m in offered for m in wanted):
+            wanted = newest(keys[0], "speech")[:2] or wanted
+            log.warning("  the configured speech model is gone; using %s", ", ".join(wanted))
+        self.models = [(model, key) for model in wanted for key in keys]   # best model first, on every key
         self.cache, self.ffmpeg = cache, ffmpeg
         self.last = 0.0
 
