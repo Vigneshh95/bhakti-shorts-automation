@@ -77,6 +77,13 @@ jobs:
             # the series of this start (its minute: 30 = grown-ups, 31 = kids); one series a day, so the
             # day's free voice lines go to one story
             $series = if ("${{ github.event.schedule }}".StartsWith("30 ")) { "adults" } else { "kids" }
+            # ...and so does a cloud story sent back for rework (a picture to repaint, voices to hear again)
+            $rework = Get-ChildItem .cache/assets_repo/story_episodes -Directory -ErrorAction SilentlyContinue | Where-Object {
+              $f = $_.FullName
+              (Test-Path "$f/rework.json") -and -not (Test-Path "$f/published.json") -and
+              ((Get-Content "$f/maker.json" -Raw -ErrorAction SilentlyContinue) -match "cloud") -and
+              -not ((Test-Path "$f/rework_done.json") -and ((Get-Content "$f/rework_done.json" -Raw) -match ((Get-Content "$f/rework.json" -Raw | ConvertFrom-Json).id))) } | Select-Object -First 1
+            if ($rework) { $series = $rework.Name.Split("-")[0] }
             if ($approved) { $series = $approved.Name.Split("-")[0] }
             $upload = "true"
           }

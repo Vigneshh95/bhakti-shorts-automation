@@ -137,6 +137,20 @@ def _run(series: str, upload: bool, interactive: bool, settings: dict, make, Voi
             f"{datetime.fromisoformat(record['slot']):%a %d %b %H:%M} IST")
 
 
+def _rework_pending(folder: Path) -> bool:
+    """A rework was asked for and the story has not been finished again since."""
+    try:
+        rid = json.loads((folder / "rework.json").read_text(encoding="utf-8"))["id"]
+    except (OSError, ValueError, KeyError):
+        return False
+    try:
+        made = json.loads((folder / "made.json").read_text(encoding="utf-8")).get("made_at", "")
+    except (OSError, ValueError):
+        return True
+    made_id = made[:19].replace("-", "").replace(":", "").replace("T", "")
+    return not made_id or made_id < rid
+
+
 def _apply_rework(folder: Path) -> None:
     """A finished story sent back (rework.json, from `python -m stories rework` on any machine):
     the named pictures are repainted with their fix notes, every picture is checked again, every
@@ -207,6 +221,8 @@ def approve(series: str, interactive: bool = True) -> str:
         if not ready:
             return f"{series}: no finished story is waiting for approval"
         folder = ready[0]["folder"]
+        if _rework_pending(folder):
+            return f"{series}: {folder.name} is still being reworked; approve it when the new version is ready"
         (folder / "approved.json").write_text(json.dumps({"approved_at": datetime.now(P.IST).isoformat()}), encoding="utf-8")
         if _maker(folder) not in (None, _here()):
             # made on the other machine: its video is there, so it uploads it on its next run

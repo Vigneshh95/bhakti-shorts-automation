@@ -74,6 +74,18 @@ def _merge_json_dict(local: Path, remote: Path) -> None:
             p.write_text(text, encoding="utf-8")
 
 
+def _maker_side(folder: Path) -> Path | None:
+    """ROOT if this machine is making the story in `folder`, CLONE if the other one is."""
+    import os
+
+    try:
+        where = json.loads((folder / "maker.json").read_text(encoding="utf-8")).get("where")
+    except (OSError, ValueError):
+        return None
+    here = "cloud" if os.environ.get("GITHUB_ACTIONS") else "laptop"
+    return ROOT if where == here else CLONE
+
+
 def _merge_state() -> None:
     for rel in HISTORIES:
         merged = merge_histories(_read(ROOT / rel), _read(CLONE / rel))
@@ -96,12 +108,17 @@ def _merge_state() -> None:
     for side_a, side_b in ((CLONE, ROOT), (ROOT, CLONE)):
         for series in ("adults", "kids"):
             for record in (side_a / "story_episodes").glob(f"{series}-*/*.json"):
-                if record.name in ("script.json", "published.json", "approved.json", "maker.json", "made.json", "rework.json"):
+                if record.name in ("script.json", "published.json", "approved.json", "maker.json", "made.json", "rework.json",
+                                   "rework_done.json"):
                     target = side_b / record.relative_to(side_a)
                     newer_request = (record.name == "rework.json" and target.exists()
                                      and json.loads(record.read_text(encoding="utf-8")).get("id", "")
                                      > json.loads(target.read_text(encoding="utf-8")).get("id", ""))
-                    if not target.exists() or newer_request:   # otherwise the first copy stands
+                    # what the machine making the story says about it (finished when, reworks done) is
+                    # the truth: its copy replaces the other side's
+                    from_maker = (record.name in ("made.json", "rework_done.json") and target.exists()
+                                  and _maker_side(record.parent) == side_a and record.read_bytes() != target.read_bytes())
+                    if not target.exists() or newer_request or from_maker:   # otherwise the first copy stands
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(record, target)
     # each day's reviewed script: whichever side wrote it first is used by the other

@@ -65,3 +65,14 @@ def test_kids_shorts_go_to_the_kids_channel_and_are_declared_made_for_kids(monke
     assert youtube.channel_config(kids)["playlist_id"] == ""            # the main channel's playlist is not used
     monkeypatch.setenv("YT_TOKEN_FILE_KIDS", str(tmp_path / "cloud_kids.json"))
     assert youtube.channel_config(kids)["token_file"] == tmp_path / "cloud_kids.json"
+
+
+def test_a_story_sent_back_for_rework_cannot_be_approved_until_it_is_made_again(tmp_path):
+    folder = tmp_path / "kids-2026-10-11"
+    folder.mkdir()
+    (folder / "made.json").write_text(json.dumps({"made_at": "2026-10-16T22:40:00+05:30"}), encoding="utf-8")
+    assert not M._rework_pending(folder)
+    (folder / "rework.json").write_text(json.dumps({"id": "20261017105600"}), encoding="utf-8")
+    assert M._rework_pending(folder)                     # made before the rework was asked for
+    (folder / "made.json").write_text(json.dumps({"made_at": "2026-10-18T07:10:00+05:30"}), encoding="utf-8")
+    assert not M._rework_pending(folder)                 # made again after it
