@@ -1,0 +1,124 @@
+# Kutti Krishna Shorts: every day (in turn with Murugan and Mahaperiyava) baby Krishna speaks one
+# short message of wisdom to the viewer, in the spirit of his teaching, over one picture of him.
+# Run: krishna_short.bat (make + upload) or krishna_preview.bat (make only).
+# Same autopilot as the Murugan series; pictures go in krishna_images/.
+
+[series]
+name = "krishna"
+title = "Krishna Short"
+output_prefix = "krishnaAuto"
+launcher = "krishna_short.bat"
+
+[providers]
+writer = "gemini"          # gemini | claude | openai   -- picks the picture, writes the Tamil script + YouTube metadata
+fallback_writer = "openai"  # used if the main writer is down (e.g. Gemini overloaded)
+
+[models]
+gemini_text = "gemini-3.8-flash"
+gemini_text_fallback = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]   # tried in order if the main model is overloaded (verified 2026-09-27)
+claude_text = "claude-opus-5"               # needs ANTHROPIC_API_KEY (or `ant auth login`)
+openai_text = "gpt-5.4-mini"
+
+[paths]
+episodes = "episodes/krishna"          # one folder per day: script.json, image, run log
+output = "Final/krishna"               # finished videos (kept apart from Final/, so upload_short.bat can't pick them up)
+image_folder = "krishna_images"       # PUT YOUR PICTURES HERE. New ones are described once (free Gemini vision) and cached
+state = "episodes/krishna/history.json"
+bank = "episodes/krishna/spare_scripts"      # reviewed spare scripts for days when every writer is down
+
+[content]
+channel_name = "BrahmaNadagam"
+lines_min = 6
+lines_max = 8
+max_line_chars = 70                 # keeps each spoken line short and clear for the TTS voice
+recent_topics_to_avoid = 45         # don't repeat a theme used in the last N runs
+spare_scripts = 3                   # keep this many reviewed spares (written on good days, 2 extra Gemini calls)
+picture_choices = 12                # least-used pictures offered to the writer each day (never yesterday's)
+picture_rest_days = 10              # a picture isn't shown again for this many days after it was used
+# Rotating everyday themes (used when the day isn't a festival).
+title_must_contain = ["கிருஷ்ண", "Krishna", "கண்ணன்"]
+title_never_starts = ["கிருஷ்ணர் அருள் வாக்கு", "கிருஷ்ணன் அருள் வாக்கு", "Krishna"]
+default_hashtags = ["#கிருஷ்ணர்", "#Krishna", "#TamilDevotional"]
+themes = [
+  "doing your duty without worrying about the result", "a calm mind in success and failure", "true friendship (Krishna and Sudama)",
+  "surrender and trust in God", "controlling anger", "letting go of what you cannot change", "the joy of sharing",
+  "humility", "courage to do what is right", "the mind as a friend or an enemy", "kindness to all living beings",
+  "simple living and contentment", "devotion with a pure heart", "patience in hard times", "honouring mother and father",
+  "speaking the truth gently", "not envying others", "learning from mistakes", "seeing God in everyone",
+  "work done with love becomes worship", "hope and a new beginning", "joy in small things", "guarding the senses",
+  "a steady mind in difficult days", "helping without expecting thanks",
+]
+
+
+[prompts]
+system = """You write daily YouTube Shorts for the Tamil devotional channel "{channel}". Format: baby Lord
+Krishna (Kannan) speaks a short message of wisdom directly to the viewer, narrated in Tamil over one
+devotional picture of him, with word-by-word captions. About 30-45 seconds.
+
+First choose the ONE picture (image_id) from the list that best fits today's message (when two fit
+equally, take the one where his face is larger and closer). If a picture has text painted on it, the
+message must agree with that text (or choose another picture).
+
+Write for real reach AND for respect:
+- lines: {lmin}-{lmax} short Tamil sentences, spoken by Krishna to "நீ"/"உன்", sweet and playful like
+  the child Kannan but wise. Line 1 is a hook that makes the viewer stay (a striking first statement or
+  a little question). The message is in the spirit of Krishna's teaching (the Bhagavad Gita, his life in
+  Vrindavan, his friendship with Sudama...) told in the simplest everyday words; you may mention a
+  well-known moment of his life in one line. NEVER quote a verse, give a chapter or verse number, or
+  put words in quotation marks as scripture: it is a retelling in simple Tamil. The last line is a blessing.
+  Tamil script ONLY: no English letters, no digits (write numbers as Tamil words), no emoji, no
+  quotation marks. Each line at most {maxc} characters and ends with a full stop or a question mark.
+- keywords: 1-3 key Tamil words of the message, each copied exactly as it appears in the lines
+  (without punctuation). They are shown in gold in the captions.
+- Practical, positive guidance. Never: promises of miracles, money or cures; medical, legal or
+  financial advice; mocking any person or faith; fear or guilt tactics; claims that a festival is
+  today unless the context says so.
+- hook_title: 2-4 Tamil words shown on screen for the first seconds.
+- youtube_title: at most 70 characters, in Tamil, different in shape every day. Lead with TODAY'S
+  message itself, as the words a viewer would feel or search for (a question or a striking statement),
+  then "கிருஷ்ணர்" or "கண்ணன்" after it, e.g. "பலனை நினைத்து கவலையா? | கண்ணன் சொல்லும் வழி". Never begin
+  with "கிருஷ்ணர்" or a fixed series phrase. Honest, no clickbait, no ALL CAPS, no hashtags.
+- youtube_description: 2-3 natural Tamil sentences about the message, then 1 English sentence,
+  naturally using searched words (Krishna, கிருஷ்ணர், Bhagavad Gita in Tamil, Tamil devotional, today's theme).
+- hashtags: 3-5, each starting with #, e.g. #கிருஷ்ணர் #Krishna and one theme hashtag.
+- tags: 10-20 relevant search phrases, Tamil and English, about Krishna, Kannan, Gita, Tamil devotion and
+  today's theme. No numbers-only or filler tags.
+Return only JSON matching the schema."""
+
+review = """You are a careful Tamil editor and reviewer for a respectful Hindu devotional YouTube channel.
+Check this Short in which baby Lord Krishna speaks a message of wisdom, and return ok=false with specific
+issues if ANY of these hold: incorrect or unnatural Tamil; anything disrespectful to Krishna, Hinduism or
+any faith; a quoted verse, a chapter or verse number, or words presented as an exact scripture quote;
+a story detail about Krishna that is wrong; false or unverifiable claims (dates, miracles, cures, money);
+medical, legal or financial advice; a misleading or clickbait title; the message clearly doesn't fit the
+chosen picture's description. Minor stylistic preferences are not issues."""
+
+[look]                              # extra effects for autopilot videos only (manual workflow unaffected)
+zoom = false                        # the picture whole and still (no zoom-in, no slow zoom or drift)
+loop = true                         # motion returns to its start: seamless replays
+glow_pulse = true                   # soft "breathing" divine light around the subject
+talking = true                      # SadTalker: Murugan's lips move with the words (~2 h per Short on this CPU, cached)
+
+[youtube]
+playlist_title = "குட்டி கிருஷ்ணர் | Krishna Shorts"
+publish_time = "18:30"              # IST. The Short is uploaded now but goes public at this time (next day if it has passed)
+min_lead_minutes = 30
+category_id = "22"
+language = "ta"
+disclose_ai = true                  # sets YouTube's "altered or synthetic content" flag (AI image + AI voice)
+playlist = true                     # its own playlist (created on the first upload)
+playlist_id = ""
+max_uploads_per_day = 1             # protects against double runs (scheduled + manual click)
+
+[schedule]                          # only used if you install the optional daily task (python -m autopilot schedule install)
+task_name = "Krishna Autopilot Short"
+time = "10:00"                      # daily run time for the Windows scheduled task
+outage_retries = 1                  # scheduled runs only: if every writer is down, wait and retry this many times, then use a spare script
+outage_wait_minutes = 10            # ...wait this long and try again (a manual click fails fast)
+
+# The video look for this series only (written into each day's episode.toml).
+[video.talking]
+kaggle_kernel = "krishna-talking"     # this series' own Kaggle notebook for the face
+
+[video.video]
+filename = "krishnaShorts_{date}.mp4"

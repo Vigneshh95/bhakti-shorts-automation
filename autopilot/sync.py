@@ -22,11 +22,13 @@ from shorts.log import log
 
 CLONE = ROOT / ".cache" / "assets_repo"
 HISTORIES = ["episodes/auto/history.json", "episodes/periyava/history.json", "episodes/ramana/history.json",
-             "episodes/kids/history.json"]
+             "episodes/kids/history.json",
+             "episodes/krishna/history.json"]
 STATE = ["episodes/periyava/playlist.json", "daily_images/.library.json", "periyava_images/.library.json",
          "episodes/ramana/playlist.json", "ramana_images/.library.json",
+         "episodes/krishna/playlist.json", "krishna_images/.library.json",
          "sources/deivathin_kural/verdicts.json"]
-PICTURE_FOLDERS = ["daily_images", "periyava_images", "ramana_images"]
+PICTURE_FOLDERS = ["daily_images", "periyava_images", "ramana_images", "krishna_images"]
 PICTURE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
