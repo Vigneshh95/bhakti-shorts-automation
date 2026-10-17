@@ -3,7 +3,7 @@ name: Short - Krishna
 # Public 18:30 on Wednesday and Saturday IST. Several starts per day: GitHub often runs schedules late or skips one; the
 # first start that works makes and uploads the Short, the later ones see it is done and stop.
 # STOP this pipeline: Actions > Short - Krishna > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
-run-name: Short - Krishna{{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
+run-name: Short - Krishna${{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
 on:
   schedule:
     - cron: "17 22 * * 2,5"   # 03:47 IST

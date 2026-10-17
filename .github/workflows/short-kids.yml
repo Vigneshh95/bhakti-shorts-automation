@@ -3,7 +3,7 @@ name: Short - Kids channel
 # Public 17:30 every day IST. Several starts per day: GitHub often runs schedules late or skips one; the
 # first start that works makes and uploads the Short, the later ones see it is done and stop.
 # STOP this pipeline: Actions > Short - Kids channel > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
-run-name: Short - Kids channel{{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
+run-name: Short - Kids channel${{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
 on:
   schedule:
     - cron: "7 23 * * *"   # 04:37 IST

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["shorts/**", "autopilot/**", "tests/**", "ci/**", ".github/workflows/tests.yml", "*.toml"]
+    paths: ["shorts/**", "autopilot/**", "stories/**", "tests/**", "ci/**", ".github/workflows/**", "*.toml"]
 
 jobs:
   tests:

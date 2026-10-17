@@ -3,7 +3,7 @@ name: Story - Kids
 # Runs every day: on its own days (Tue, Thu, Sat) it makes the story in progress or starts the next one; on
 # the other days it only uploads an approved story or redoes a story sent back for rework.
 # STOP this pipeline: Actions > Story - Kids > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
-run-name: Story - Kids{{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
+run-name: Story - Kids${{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
 on:
   schedule:
     - cron: "31 19 * * *"   # 01:00 IST
