@@ -1,0 +1,30 @@
+name: Short - Krishna
+# Baby Krishna's message of the day on BrahmaNadagam (Murugan until Krishna's pictures are in). Days: Wed, Sat
+# Public 18:30 on Wednesday and Saturday IST. Several starts per day: GitHub often runs schedules late or skips one; the
+# first start that works makes and uploads the Short, the later ones see it is done and stop.
+# STOP this pipeline: Actions > Short - Krishna > "..." > Disable workflow (or pipeline_pause.bat on the laptop).
+run-name: Short - Krishna{{ github.event_name == 'workflow_dispatch' && ' (by hand)' || '' }}
+on:
+  schedule:
+    - cron: "17 22 * * 2,5"   # 03:47 IST
+    - cron: "47 0 * * 3,6"   # 06:17 IST
+    - cron: "47 3 * * 3,6"   # 09:17 IST
+    - cron: "17 9 * * 3,6"   # 14:47 IST
+    - cron: "47 11 * * 3,6"   # 17:17 IST
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload to YouTube (off = make only; the video is attached to the run)
+        type: boolean
+        default: false
+permissions:
+  contents: write   # only for the "keep the schedule active" commit
+jobs:
+  short:
+    uses: ./.github/workflows/_short.yml
+    with:
+      series: krishna
+      pipeline: short-krishna
+      upload: ${{ github.event_name == 'schedule' || inputs.upload }}
+      publish_hour: 18
+    secrets: inherit

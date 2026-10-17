@@ -35,6 +35,11 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--scheduled", action="store_true", help="unattended: never open a browser")
     sub.add_parser("check")
     sub.add_parser("signin")
+    pa = sub.add_parser("pause", help="pause a cloud pipeline (or: all)")
+    pa.add_argument("pipeline")
+    re_ = sub.add_parser("resume", help="resume a paused cloud pipeline (or: all)")
+    re_.add_argument("pipeline")
+    sub.add_parser("pauses", help="what is paused now")
     sy = sub.add_parser("sync")
     sy.add_argument("--restore", action="store_true", help="also copy every shared file into place (a fresh machine)")
     pc = sub.add_parser("pictures")
@@ -52,6 +57,14 @@ def main(argv: list[str] | None = None) -> int:
 
             run(args.date, upload=not args.no_upload, publish_now=args.publish_now, force=args.force,
                 interactive=not args.scheduled, series=args.series, shared=True)
+        elif args.cmd in ("pause", "resume", "pauses"):
+            from autopilot import pause
+
+            if args.cmd == "pauses":
+                for line in pause.report():
+                    log.info("%s", line)
+            else:
+                log.info("✅ %s", pause.set_paused(args.pipeline, args.cmd == "pause"))
         elif args.cmd == "sync":
             from autopilot import sync
 

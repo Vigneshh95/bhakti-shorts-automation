@@ -1,56 +1,25 @@
-name: Make a Short
+name: _short (shared steps, not run on its own)
 
-# ONE Short a day at 18:30 IST, made and uploaded in the cloud with the laptop switched off (the
-# same autopilot as the .bat files). Murugan, Mahaperiyava and Krishna take turns:
-#
-#   18 Oct 2026 Murugan, 19 Oct Mahaperiyava, 20 Oct Krishna, 21 Oct Murugan, ...   (see "anchor" below)
-# The Ramana Maharshi series is built but on hold (no pictures yet): it can be started by hand.
-# Starts: 03:47, 06:17, 09:17, 14:47 and 17:17 IST. The first start that succeeds makes and
-# uploads the Short; later starts see it is done and stop in seconds. They exist because GitHub
-# runs schedules late (often by hours) or skips one.
-# The kids' channel ("குட்டி முருகன் கதைகள்") gets its own Short EVERY day at 17:30 IST: baby Murugan
-# telling small children one good habit. Its starts: 04:37, 08:07 and 12:07 IST.
-# It can also be started by hand: Actions tab > Make a Short > Run workflow.
-#
-# Private files (pictures, voice sample, music, chapter text) and the shared history live in a
-# second, private repository named by the ASSETS_REPO variable; the laptop reads and writes the
-# same history, so a Short is never posted twice. Keys are repository secrets.
+# The steps every Short pipeline shares. Each series has its own pipeline file that calls this one
+# (short-murugan.yml, short-periyava.yml, short-krishna.yml, short-kids.yml), so every pipeline has
+# its own name, its own schedule and its own on/off switch:
+#   - stop one in GitHub: Actions > the pipeline > "..." > Disable workflow (Enable to start again)
+#   - or from the laptop: pipeline_pause.bat (pauses.json in the private files; resume the same way)
 on:
-  schedule:
-    # Times are UTC. GitHub starts scheduled runs late, often by hours (seen: 1 to 5 hours),
-    # so every start is early enough that even a 5-hour delay still meets the publish time, and
-    # each series has three starts. Minute 17 = the first start of the series.
-    - cron: "17 22 * * *"   # 03:47 IST   (public 18:30 IST that day)
-    - cron: "47 0 * * *"    # 06:17 IST
-    - cron: "47 3 * * *"    # 09:17 IST
-    - cron: "17 9 * * *"    # 14:47 IST
-    - cron: "47 11 * * *"   # 17:17 IST, last chance
-    - cron: "7 23 * * *"    # kids' channel  04:37 IST   (public 17:30 IST that day)
-    - cron: "37 2 * * *"    # kids' channel  08:07 IST
-    - cron: "37 6 * * *"    # kids' channel  12:07 IST, last chance
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      series:
-        description: Which series
-        type: choice
-        options: [periyava, murugan, krishna, ramana, kids]
-        default: periyava
-      upload:
-        description: Upload to YouTube (off = make only; the video is attached to the run)
-        type: boolean
-        default: false
-
-permissions:
-  contents: write   # only for the "keep the schedule active" commit below
-
-concurrency:
-  group: short-${{ github.event.schedule || inputs.series }}
-  cancel-in-progress: false
+      series: {type: string, required: true}           # murugan | periyava | krishna | kids | ramana
+      pipeline: {type: string, required: true}         # its name in pauses.json, e.g. short-murugan
+      upload: {type: boolean, default: true}
+      publish_hour: {type: number, default: 18}        # a start after this hour (IST) is too late for today's slot
 
 jobs:
   short:
     runs-on: windows-latest
     timeout-minutes: 120
+    concurrency:
+      group: ${{ inputs.pipeline }}
+      cancel-in-progress: false
     env:
       PYTHONIOENCODING: utf-8
       PYTHONPATH: ${{ github.workspace }}
@@ -75,35 +44,29 @@ jobs:
         env:
           HAS_KIDS_SIGN_IN: ${{ secrets.YT_TOKEN_KIDS_JSON != '' }}
         run: |
-          $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
+          $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}".ToLower()
           $scheduled = "${{ github.event_name }}" -eq "schedule"
-          # Which day's Short this is, in India time. A start that GitHub ran so late that it is
-          # already past 18:00 is skipped: the 18:30 slot is gone.
-          $now = [DateTime]::UtcNow.AddHours(5.5)
+          $now = [DateTime]::UtcNow.AddHours(5.5)          # India time
           $day = $now.ToString("yyyy-MM-dd")
-          $late = $false
-          if ($scheduled) {
-            $upload = "true"
-            # One Short a day, the series in turn: Murugan, Mahaperiyava, Krishna (anchor = a Murugan day).
-            # Until Krishna's pictures are in the private files, Murugan takes Krishna's day.
-            $anchor = [DateTime]::ParseExact("2026-10-18", "yyyy-MM-dd", $null)
-            $turn = ((($now.Date - $anchor).Days % 3) + 3) % 3
-            $hasKrishna = [bool](Get-ChildItem ".cache/assets_repo/krishna_images" -File -ErrorAction SilentlyContinue |
-                                 Where-Object { $_.Extension -in ".png", ".jpg", ".jpeg", ".webp" })
-            $series = @("murugan", "periyava", $(if ($hasKrishna) { "krishna" } else { "murugan" }))[$turn]
-            if ($now.Hour -ge 18) { $late = $true }
-            if ([int]("${{ github.event.schedule }}".Split(" ")[1]) -in 23, 2, 6) {   # the kids' channel's own starts
-              $series = "kids"
-              $late = $now.Hour -ge 17
-            }
+          $skip = ""
+          # paused from the laptop (pipeline_pause.bat) or everything paused
+          $pauses = ".cache/assets_repo/pauses.json"
+          if (Test-Path $pauses) {
+            $p = Get-Content $pauses -Raw -Encoding utf8 | ConvertFrom-Json
+            if ($p."${{ inputs.pipeline }}" -or $p.all) { $skip = "this pipeline is PAUSED (pipeline_pause.bat on the laptop resumes it)" }
           }
+          if ($series -eq "krishna") {      # until Krishna's pictures are in the private files, Murugan takes his day
+            $has = [bool](Get-ChildItem ".cache/assets_repo/krishna_images" -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".png", ".jpg", ".jpeg", ".webp" })
+            if (-not $has) { $series = "murugan"; Write-Host "::warning title=krishna::No Krishna pictures in the private files yet: making a Murugan Short today" }
+          }
+          if ($scheduled -and $now.Hour -ge ${{ inputs.publish_hour }}) { $skip = "this start ran too late for today's publish time (the next starts carry on)" }
+          if ($series -eq "kids" -and $upload -eq "true" -and $env:HAS_KIDS_SIGN_IN -ne "true") { $skip = "the YT_TOKEN_KIDS_JSON secret is not set" }
           $folder = if ($series -eq "murugan") { "auto" } else { $series }
           $done = $false
-          if ($upload -eq "true") {
-            # Done when ANY series already has a Short that goes public today (so there is never a
-            # second Short on one day, whichever series or start made the first).
-            # (The kids' channel is separate: it has its own Short every day.)
-            foreach ($f in $(if ($series -eq "kids") { @("kids") } else { "auto", "periyava", "ramana", "krishna" })) {
+          if ($upload -eq "true" -and -not $skip) {
+            # Done when a Short already goes public today on this channel, whichever series or start made it.
+            $same = if ($series -eq "kids") { @("kids") } else { @("auto", "periyava", "ramana", "krishna") }
+            foreach ($f in $same) {
               $history = ".cache/assets_repo/episodes/$f/history.json"
               if (-not (Test-Path $history)) { continue }
               foreach ($r in (Get-Content $history -Raw -Encoding utf8 | ConvertFrom-Json)) {
@@ -115,16 +78,12 @@ jobs:
           }
           # Scheduled runs never post a Short whose face doesn't talk: if the talking face can't be
           # made the run fails (GitHub emails you) and the next start tries again.
-          $strict = if ("${{ github.event_name }}" -eq "schedule" -or $upload -eq "true") { "1" } else { "0" }
-          if ($late) { $done = $true }
-          if ($series -eq "kids" -and $upload -eq "true" -and $env:HAS_KIDS_SIGN_IN -ne "true") {
-            $done = $true
-            Write-Host "::warning title=kids::The YT_TOKEN_KIDS_JSON secret is not set, so the kids' channel can't be uploaded to yet -- skipped"
-          }
-          "series=$series", "upload=$upload", "day=$day", "strict=$strict", "todo=$(if ($done) { 'no' } else { 'yes' })" | Add-Content $env:GITHUB_OUTPUT
-          if ($late) { Write-Host "::warning title=$series::This start ran too late for today's publish time -- skipped (the next day's starts carry on as usual)" }
-          elseif ($done) { Write-Host "::notice title=$series::A Short is already uploaded for $day -- nothing to do" }
-          else { Write-Host "::notice title=$series::Making the Short for $day (upload: $upload)" }
+          $strict = if ($scheduled -or $upload -eq "true") { "1" } else { "0" }
+          $todo = if ($skip -or $done) { "no" } else { "yes" }
+          "series=$series", "upload=$upload", "day=$day", "strict=$strict", "todo=$todo" | Add-Content $env:GITHUB_OUTPUT
+          if ($skip) { Write-Host "::notice title=${{ inputs.pipeline }}::Skipped: $skip" }
+          elseif ($done) { Write-Host "::notice title=${{ inputs.pipeline }}::A Short is already uploaded for $day -- nothing to do" }
+          else { Write-Host "::notice title=${{ inputs.pipeline }}::Making the $series Short for $day (upload: $upload)" }
 
       - uses: actions/setup-python@v5
         if: steps.plan.outputs.todo == 'yes'
@@ -178,18 +137,19 @@ jobs:
           python -m autopilot --series ${{ steps.plan.outputs.series }} run --scheduled --date ${{ steps.plan.outputs.day }} @extra 2>&1 | Tee-Object -FilePath run.log
           $code = $LASTEXITCODE
           $last = (Get-Content run.log | Where-Object { $_ -match "^\d\d:\d\d:\d\d (INFO|WARNING|ERROR)" -and $_ -match "✅|⏸|ERROR|WARNING|Uploaded|stopped|Already|talking head|animated|title:" } | Select-Object -Last 10) -join "%0A"
-          if ($code -ne 0) { Write-Host "::error title=the Short was not made::$last"; exit $code }
-          if ($last -match "⏸") { Write-Host "::error title=made but NOT uploaded (YouTube sign-in expired: update the YT_TOKEN_JSON secret)::$last"; exit 1 }
+          $secret = if ("${{ steps.plan.outputs.series }}" -eq "kids") { "YT_TOKEN_KIDS_JSON" } else { "YT_TOKEN_JSON" }
+          if ($code -ne 0) { Write-Host "::error title=${{ inputs.pipeline }}: the Short was not made::$last"; exit $code }
+          if ($last -match "⏸") { Write-Host "::error title=${{ inputs.pipeline }}: made but NOT uploaded (YouTube sign-in expired: update the $secret secret)::$last"; exit 1 }
           if (Select-String -Path run.log -Pattern "talking head skipped|using the still picture|no laptop fallback" -Quiet) {
-            Write-Host "::warning title=${{ steps.plan.outputs.series }}: made WITHOUT the talking face (still picture)::$last"
+            Write-Host "::warning title=${{ inputs.pipeline }}: made WITHOUT the talking face (still picture)::$last"
           }
-          Write-Host "::notice title=${{ steps.plan.outputs.series }}::$last"
+          Write-Host "::notice title=${{ inputs.pipeline }}::$last"
 
       - name: The video (kept 7 days)
         if: always() && steps.plan.outputs.todo == 'yes'
         uses: actions/upload-artifact@v4
         with:
-          name: short-${{ steps.plan.outputs.series }}
+          name: ${{ inputs.pipeline }}-${{ steps.plan.outputs.day }}
           path: |
             Final/**/*.mp4
             episodes/**/run.log

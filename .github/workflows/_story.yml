@@ -1,51 +1,27 @@
-name: Make a Story
-# Each run's name in the Actions list says which series it is for.
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('Story by hand ({0})', inputs.series) || (startsWith(github.event.schedule, '30 ') && 'Grown-ups story' || 'Kids story') }}
+name: _story (shared steps, not run on its own)
 
-# The long illustrated stories, made and scheduled in the cloud with the laptop switched off: the
-# same pipeline as story_adults.bat / story_kids.bat (python -m stories run).
-#
-#   grown-ups' stories  -> the main channel, public Wednesday and Saturday 19:00 IST
-#   kids' stories       -> the kids' own channel, public Thursday and Sunday 10:00 IST
-# A story takes more than one run: its pictures are painted on Kaggle (over an hour) and its
-# voices are acted by Gemini's free speech models, which allow a limited number of lines a day.
-# So this runs every day, one series a day (the run's name says which), and each run does today's share: it continues
-# the story in progress, or starts a new one when fewer than two are waiting to go public.
-# Unfinished work (pictures, voice lines) is kept between runs in the Actions cache.
-# It can also be started by hand: Actions tab > Make a Story > Run workflow.
+# The steps both story pipelines share (story-adults.yml, story-kids.yml), each with its own name,
+# schedule and on/off switch:
+#   - stop one in GitHub: Actions > the pipeline > "..." > Disable workflow
+#   - or from the laptop: pipeline_pause.bat
+# A story takes more than one run: its pictures are painted on Kaggle (over an hour) and its voices
+# are acted by Gemini's free speech model, which allows a limited number of lines a day. Unfinished
+# work (pictures, voice lines) is kept between runs in the Actions cache.
 on:
-  schedule:
-    # 01:00 IST (19:30 UTC the day before): after the free speech allowance of the day before has
-    # come back; 07:00 IST: a second start, in case GitHub skipped or delayed the first.
-    # Grown-ups' stories (minute 30): Sunday, Monday, Wednesday, Friday (India days)
-    - cron: "30 19 * * 0,2,4,6"
-    - cron: "30 1 * * 0,1,3,5"
-    # Kids' stories (minute 31): Tuesday, Thursday, Saturday (India days)
-    - cron: "31 19 * * 1,3,5"
-    - cron: "31 1 * * 2,4,6"
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      series:
-        description: Which series
-        type: choice
-        options: [adults, kids]
-        default: adults
-      upload:
-        description: Upload to YouTube when the story is finished
-        type: boolean
-        default: true
-
-permissions:
-  contents: read
-
-concurrency:
-  group: story
-  cancel-in-progress: false
+      series: {type: string, required: true}       # adults | kids
+      pipeline: {type: string, required: true}     # its name in pauses.json
+      days: {type: string, required: true}         # India weekdays (0 = Sunday) on which it makes stories
+      upload: {type: boolean, default: true}
 
 jobs:
   story:
     runs-on: windows-latest
     timeout-minutes: 330
+    concurrency:
+      group: story
+      cancel-in-progress: false
     env:
       PYTHONIOENCODING: utf-8
       PYTHONPATH: ${{ github.workspace }}
@@ -64,39 +40,42 @@ jobs:
           token: ${{ secrets.ASSETS_TOKEN }}
           path: .cache/assets_repo
 
-      - name: Which series today
+      - name: What to do today
         id: plan
         shell: pwsh
         run: |
-          $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}"
-          if ("${{ github.event_name }}" -eq "schedule") {
-            # an approved story waiting to be uploaded goes first, whatever the day
-            $approved = Get-ChildItem .cache/assets_repo/story_episodes -Directory -ErrorAction SilentlyContinue | Where-Object {
-              (Test-Path "$($_.FullName)/approved.json") -and -not (Test-Path "$($_.FullName)/published.json") -and
-              ((Get-Content "$($_.FullName)/maker.json" -Raw -ErrorAction SilentlyContinue) -match "cloud") } | Select-Object -First 1
-            # the series of this start (its minute: 30 = grown-ups, 31 = kids); one series a day, so the
-            # day's free voice lines go to one story
-            $series = if ("${{ github.event.schedule }}".StartsWith("30 ")) { "adults" } else { "kids" }
-            # ...and so does a cloud story sent back for rework (a picture to repaint, voices to hear again)
-            $rework = Get-ChildItem .cache/assets_repo/story_episodes -Directory -ErrorAction SilentlyContinue | Where-Object {
-              $f = $_.FullName
-              (Test-Path "$f/rework.json") -and -not (Test-Path "$f/published.json") -and
-              ((Get-Content "$f/maker.json" -Raw -ErrorAction SilentlyContinue) -match "cloud") -and
-              -not ((Test-Path "$f/rework_done.json") -and ((Get-Content "$f/rework_done.json" -Raw) -match ((Get-Content "$f/rework.json" -Raw | ConvertFrom-Json).id))) } | Select-Object -First 1
-            if ($rework) { $series = $rework.Name.Split("-")[0] }
-            if ($approved) { $series = $approved.Name.Split("-")[0] }
-            $upload = "true"
+          $series = "${{ inputs.series }}"; $upload = "${{ inputs.upload }}".ToLower()
+          $now = [DateTime]::UtcNow.AddHours(5.5)
+          $myday = "${{ inputs.days }}".Split(",") -contains ([int]$now.DayOfWeek).ToString()
+          $skip = ""
+          $pauses = ".cache/assets_repo/pauses.json"
+          if (Test-Path $pauses) {
+            $p = Get-Content $pauses -Raw -Encoding utf8 | ConvertFrom-Json
+            if ($p."${{ inputs.pipeline }}" -or $p.all) { $skip = "this pipeline is PAUSED (pipeline_pause.bat on the laptop resumes it)" }
           }
-          "series=$series", "upload=$upload" | Add-Content $env:GITHUB_OUTPUT
-          Write-Host "::notice title=story::Today's series: $series (upload: $upload)"
+          # On any day: an approved story of this series to upload, or one sent back for rework.
+          $urgent = Get-ChildItem .cache/assets_repo/story_episodes -Directory -Filter "$series-*" -ErrorAction SilentlyContinue | Where-Object {
+            $f = $_.FullName
+            ((Get-Content "$f/maker.json" -Raw -ErrorAction SilentlyContinue) -match "cloud") -and -not (Test-Path "$f/published.json") -and (
+              (Test-Path "$f/approved.json") -or ((Test-Path "$f/rework.json") -and -not ((Test-Path "$f/rework_done.json") -and
+                ((Get-Content "$f/rework_done.json" -Raw) -match ((Get-Content "$f/rework.json" -Raw | ConvertFrom-Json).id))))) } | Select-Object -First 1
+          if (-not $skip -and "${{ github.event_name }}" -eq "schedule" -and -not $myday -and -not $urgent) {
+            $skip = "not a ${{ inputs.series }} story day (one series a day uses the day's free voice lines)"
+          }
+          $todo = if ($skip) { "no" } else { "yes" }
+          "series=$series", "upload=$upload", "todo=$todo" | Add-Content $env:GITHUB_OUTPUT
+          if ($skip) { Write-Host "::notice title=${{ inputs.pipeline }}::Skipped: $skip" }
+          else { Write-Host "::notice title=${{ inputs.pipeline }}::Working on the $series story (upload: $upload)" }
 
       - uses: actions/setup-python@v5
+        if: steps.plan.outputs.todo == 'yes'
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: ci/constraints.txt
 
       - name: FFmpeg and models (kept between runs)
+        if: steps.plan.outputs.todo == 'yes'
         uses: actions/cache@v4
         with:
           path: |
@@ -106,6 +85,7 @@ jobs:
           key: models-v1
 
       - name: Stories in progress (kept between runs)
+        if: steps.plan.outputs.todo == 'yes'
         uses: actions/cache@v4
         with:
           path: |
@@ -115,11 +95,13 @@ jobs:
           restore-keys: stories-
 
       - name: Set up the machine
+        if: steps.plan.outputs.todo == 'yes'
         shell: pwsh
         run: |
           try { ./ci/setup.ps1 -NoVoice } catch { Write-Host "::error title=setup failed::$($_ | Out-String)"; exit 1 }
 
       - name: Put the keys in place
+        if: steps.plan.outputs.todo == 'yes'
         shell: pwsh
         env:
           KAGGLE_ACCESS_TOKEN: ${{ secrets.KAGGLE_ACCESS_TOKEN }}
@@ -136,6 +118,7 @@ jobs:
           $global:LASTEXITCODE = 0
 
       - name: Make the story
+        if: steps.plan.outputs.todo == 'yes'
         shell: pwsh
         run: |
           git -C .cache/assets_repo config user.name "cloud"; git -C .cache/assets_repo config user.email "cloud@users.noreply.github.com"
@@ -147,10 +130,10 @@ jobs:
           Write-Host "::notice title=${{ steps.plan.outputs.series }} story::$last"
 
       - name: The finished video and thumbnail (kept 7 days)
-        if: always()
+        if: always() && steps.plan.outputs.todo == 'yes'
         uses: actions/upload-artifact@v4
         with:
-          name: story-${{ steps.plan.outputs.series }}
+          name: ${{ inputs.pipeline }}-${{ github.run_number }}
           path: |
             story_episodes/*/video.mp4
             story_episodes/*/thumbnail.jpg
@@ -160,7 +143,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Tidy what is kept for the next run
-        if: always()
+        if: always() && steps.plan.outputs.todo == 'yes'
         shell: pwsh
         run: |
           # A story that is uploaded no longer needs its pictures and video here (its script and

@@ -1,0 +1,27 @@
+name: Health check
+# Every morning, before the day's pipelines need them: are both YouTube sign-ins, the Gemini keys,
+# the Kaggle and Hugging Face tokens and the private-files token still working? A failure makes
+# this run red, and GitHub emails you what to do. Nothing is made or uploaded.
+run-name: Health check
+on:
+  schedule:
+    - cron: "30 20 * * *"   # 02:00 IST, before the first Short starts
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every sign-in and key
+        env:
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          YT_TOKEN_KIDS_JSON: ${{ secrets.YT_TOKEN_KIDS_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_STORIES: ${{ secrets.GEMINI_API_KEY_STORIES }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          KAGGLE_ACCESS_TOKEN: ${{ secrets.KAGGLE_ACCESS_TOKEN }}
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+        run: python3 ci/health.py
