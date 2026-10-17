@@ -274,7 +274,9 @@ def make(folder: Path, settings: dict) -> Path:
         actor = V.Actor(settings, cache, ff)
         total = sum(len(sc["lines"]) for sc in script["scenes"])
         done = missing = 0
-        by_scene = acting.get("per", "turn") == "scene"
+        # How this story's voices are made is fixed when it is written ("voice_per"): a story already
+        # being voiced line by line keeps that way, so its finished lines stay in use.
+        by_scene = script.get("voice_per", "turn") == "scene"
         if by_scene:
             # A whole scene in one or two requests (two speakers at a time): about half the requests
             # of a story, and the people answer each other in one breath.

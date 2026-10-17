@@ -59,7 +59,8 @@ enabled = true
 models = ["gemini-3.1-flash-tts-preview"]   # only this model: the others read their English directions aloud,
                                       # rambled, or spoke Tamil with an English accent (2026-10-11..15)
 requests_per_minute = 8
-per = "turn"                          # "scene" = a whole scene in one or two requests (half the requests; being tested)
+per = "scene"                         # a whole scene in one or two requests (two speakers at a time): about half the
+                                      # requests of "turn" (one per speaker's turn). Tested 2026-10-17. New stories only.
 
 [acting.voices.narrator]
 voice = "Sulafat"

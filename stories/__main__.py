@@ -109,6 +109,7 @@ def _run(series: str, upload: bool, interactive: bool, settings: dict, make, Voi
         log.info("▶ writing a new %s story: %s", series, topic)
         titles = [r["script"]["title_ta"] for r in records if r["script"]]
         script = writer.write(series, topic, settings, titles)
+        script["voice_per"] = settings.get("acting", {}).get("per", "turn")
         (folder / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
         log.info("  \"%s\" (%d scenes)", script["title_ta"], len(script["scenes"]))
 
