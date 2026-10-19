@@ -76,3 +76,14 @@ def test_a_story_sent_back_for_rework_cannot_be_approved_until_it_is_made_again(
     assert M._rework_pending(folder)                     # made before the rework was asked for
     (folder / "made.json").write_text(json.dumps({"made_at": "2026-10-18T07:10:00+05:30"}), encoding="utf-8")
     assert not M._rework_pending(folder)                 # made again after it
+
+
+def test_every_kids_channel_series_finds_the_kids_sign_in_in_the_cloud(monkeypatch, tmp_path):
+    """2026-10-19: the Krishna kids' Short was made but not uploaded, because the cloud's sign-in file
+    was looked up under YT_TOKEN_FILE_KRISHNA. All kids' channel series share YT_TOKEN_FILE_KIDS."""
+    from autopilot import youtube
+    from autopilot.settings import load_settings
+
+    monkeypatch.setenv("YT_TOKEN_FILE_KIDS", str(tmp_path / "cloud_kids.json"))
+    for series in ("kids", "krishna"):
+        assert youtube.channel_config(load_settings(series=series))["token_file"] == tmp_path / "cloud_kids.json", series

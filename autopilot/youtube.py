@@ -35,7 +35,7 @@ def channel_config(settings: dict | None = None) -> dict:
         name = (settings or {}).get("series", {}).get("name", "").upper()
         return {
             "client_secrets": resolve(os.environ.get("YT_CLIENT_SECRET_FILE") or cp.get("Paths", "client_secrets")),
-            "token_file": resolve(os.environ.get(f"YT_TOKEN_FILE_{name}") or yt["token_file"]),
+            "token_file": resolve(os.environ.get(yt.get("token_env") or f"YT_TOKEN_FILE_{name}") or yt["token_file"]),
             "playlist_id": "", "instagram_url": "", "support_url": "",   # the main channel's links don't belong here
         }
 

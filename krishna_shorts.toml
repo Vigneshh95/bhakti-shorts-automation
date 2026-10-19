@@ -115,6 +115,7 @@ language = "ta"
 disclose_ai = true
 made_for_kids = true                  # a legal declaration: YouTube turns off comments and personalised ads
 token_file = "sign_in_files/2_Kids_channel_YouTube_sign_in.json"        # the kids' channel sign-in (story_kids_sign_in.bat)
+token_env = "YT_TOKEN_FILE_KIDS"            # where the cloud puts the kids' channel sign-in (the same for every kids series)
 channel_id = "UCfKL9kT6cpKr4E9puFXAJMQ"   # குட்டி முருகன் கதைகள்: an upload under any other sign-in is refused
 playlist = true
 playlist_title = "குட்டி கண்ணன் | Kutti Krishna for Kids"
