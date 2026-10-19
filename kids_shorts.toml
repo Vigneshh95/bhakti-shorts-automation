@@ -1,6 +1,6 @@
 # Kutti Murugan Shorts for children: every day baby Murugan tells a small child ONE good habit or
 # value in a few very simple sentences, as a friend. Uploaded to the kids' own channel
-# ("குட்டி முருகன் கதைகள்"), declared made for kids.
+# ("அருள் குட்டீஸ்"), declared made for kids.
 # Run: kids_short.bat (make + upload) or kids_preview.bat (make only).
 # The same autopilot and the same pictures (daily_images/) as the Murugan series; a picture used
 # here rests for this series only.
@@ -29,7 +29,7 @@ state = "episodes/kids/history.json"
 bank = "episodes/kids/spare_scripts"
 
 [content]
-channel_name = "குட்டி முருகன் கதைகள்"
+channel_name = "அருள் குட்டீஸ்"
 lines_min = 5
 lines_max = 6
 max_line_chars = 48                   # very short sentences: a five-year-old follows one idea at a time
@@ -114,7 +114,7 @@ disclose_ai = true
 made_for_kids = true                  # a legal declaration: YouTube turns off comments and personalised ads
 token_file = "sign_in_files/2_Kids_channel_YouTube_sign_in.json"        # the kids' channel sign-in (story_kids_sign_in.bat)
 token_env = "YT_TOKEN_FILE_KIDS"            # where the cloud puts the kids' channel sign-in (the same for every kids series)
-channel_id = "UCfKL9kT6cpKr4E9puFXAJMQ"   # குட்டி முருகன் கதைகள்: an upload under any other sign-in is refused
+channel_id = "UCfKL9kT6cpKr4E9puFXAJMQ"   # அருள் குட்டீஸ் (the kids' channel): an upload under any other sign-in is refused
 playlist = false
 playlist_id = ""
 max_uploads_per_day = 1
@@ -134,4 +134,4 @@ kaggle_kernel = "kids-talking"        # this series' own Kaggle notebook for the
 filename = "kidsShorts_{date}.mp4"
 
 [video.effects.watermark]
-lines = ["குட்டி முருகன்", "குட்டி முருகன் கதைகள்"]
+lines = ["குட்டி முருகன்", "அருள் குட்டீஸ்"]

@@ -1,6 +1,6 @@
 # Kutti Kannan Shorts for children: every other day (in turn with Kutti Murugan) baby Krishna tells a
 # small child ONE good habit or value in a few very simple sentences, as a friend. On the kids' own
-# channel ("குட்டி முருகன் கதைகள்"), declared made for kids.
+# channel ("அருள் குட்டீஸ்"), declared made for kids.
 # Run: krishna_short.bat (make + upload) or krishna_preview.bat (make only). Pictures: krishna_images/.
 
 [series]
@@ -27,7 +27,7 @@ state = "episodes/krishna/history.json"
 bank = "episodes/krishna/spare_scripts"
 
 [content]
-channel_name = "குட்டி முருகன் கதைகள்"
+channel_name = "அருள் குட்டீஸ்"
 lines_min = 5
 lines_max = 6
 max_line_chars = 48                   # very short sentences: a five-year-old follows one idea at a time
@@ -116,7 +116,7 @@ disclose_ai = true
 made_for_kids = true                  # a legal declaration: YouTube turns off comments and personalised ads
 token_file = "sign_in_files/2_Kids_channel_YouTube_sign_in.json"        # the kids' channel sign-in (story_kids_sign_in.bat)
 token_env = "YT_TOKEN_FILE_KIDS"            # where the cloud puts the kids' channel sign-in (the same for every kids series)
-channel_id = "UCfKL9kT6cpKr4E9puFXAJMQ"   # குட்டி முருகன் கதைகள்: an upload under any other sign-in is refused
+channel_id = "UCfKL9kT6cpKr4E9puFXAJMQ"   # அருள் குட்டீஸ் (the kids' channel): an upload under any other sign-in is refused
 playlist = true
 playlist_title = "குட்டி கண்ணன் | Kutti Krishna for Kids"
 playlist_id = ""
@@ -137,4 +137,4 @@ kaggle_kernel = "krishna-talking"     # this series' own Kaggle notebook for the
 filename = "krishnaShorts_{date}.mp4"
 
 [video.effects.watermark]
-lines = ["குட்டி கண்ணன்", "குட்டி முருகன் கதைகள்"]
+lines = ["குட்டி கண்ணன்", "அருள் குட்டீஸ்"]

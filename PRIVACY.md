@@ -1,7 +1,7 @@
 # Privacy policy: Murugan Uploader
 
 Murugan Uploader is a private tool used only by the owner of the YouTube channels
-"BrahmaNadagam" and "குட்டி முருகன் கதைகள்" to upload and schedule that owner's own videos.
+"BrahmaNadagam" and "அருள் குட்டீஸ்" (the kids' channel) to upload and schedule that owner's own videos.
 
 ## What it accesses
 
