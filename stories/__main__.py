@@ -81,8 +81,34 @@ def _maker(folder: Path) -> str | None:
         return None
 
 
+def _retry_thumbnails(series: str, settings: dict, records: list[dict], interactive: bool) -> None:
+    """A story uploaded before its channel could take custom thumbnails (YouTube allows them only on
+    phone-verified channels) gets its thumbnail as soon as the channel can take it."""
+    for r in records:
+        rec = r["published"]
+        thumb = r["folder"] / "thumbnail.jpg"
+        if not rec or rec.get("thumbnail") or not thumb.exists():
+            continue
+        try:
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaFileUpload
+
+            from autopilot import youtube as Y
+
+            yt = build("youtube", "v3", credentials=Y._credentials(P.channel(series, settings["youtube"][series]), interactive),
+                       cache_discovery=False)
+            yt.thumbnails().set(videoId=rec["video_id"], media_body=MediaFileUpload(str(thumb))).execute()
+            rec["thumbnail"] = True
+            (r["folder"] / "published.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
+            log.info("  thumbnail set now for https://youtu.be/%s", rec["video_id"])
+        except Exception as e:  # noqa: BLE001 -- still not allowed: tried again on the next run
+            log.info("  thumbnail for https://youtu.be/%s still can't be set (%s)", rec["video_id"], str(e)[:120])
+
+
 def _run(series: str, upload: bool, interactive: bool, settings: dict, make, VoiceLimit) -> str:
     records = _records(settings, series)
+    if upload:
+        _retry_thumbnails(series, settings, records, interactive)
     open_ones = [r for r in records if not r["published"]]
     mine = [r for r in open_ones if _maker(r["folder"]) in (None, _here())]
     if open_ones and not mine:
